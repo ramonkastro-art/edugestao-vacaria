@@ -3,13 +3,15 @@ import {
   Search, School, Users, Home, FileText, LogOut,
   CheckCircle2, AlertCircle, ArrowRightLeft, X,
   Menu, ChevronRight, GraduationCap, Briefcase,
-  Loader2, RefreshCw, Shield, SlidersHorizontal
+  Loader2, RefreshCw, Shield, UserCircle, Phone,
+  Mail, MapPin, Calendar, Hash, BookOpen, Building2
 } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import {
   useEscolas, useProfessores, useProfessoresByEscola,
-  useEfetividade, useDashboardStats, buscarGlobal
+  useEfetividade, useDashboardStats, buscarGlobal,
+  useServidorDetalhes, useServidores
 } from './hooks/useData'
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -30,6 +32,13 @@ function mesAnoLabel(s) {
   const [ano,mes] = s.split('-')
   const m=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
   return `${m[parseInt(mes)-1]} / ${ano}`
+}
+function formatDate(d) {
+  if (!d) return '—'
+  try {
+    const dt = new Date(d + 'T00:00:00')
+    return dt.toLocaleDateString('pt-BR')
+  } catch { return d }
 }
 
 // ─── UI HELPERS ──────────────────────────────────────────────────────────────
@@ -52,6 +61,168 @@ function RoleBadge({ role }) {
   const map={secretaria:{l:'Secretaria',c:'bg-violet-50 text-violet-700 border-violet-200'},rh:{l:'RH',c:'bg-blue-50 text-blue-700 border-blue-200'},diretor:{l:'Diretor',c:'bg-emerald-50 text-emerald-700 border-emerald-200'},professor:{l:'Professor',c:'bg-slate-100 text-slate-600 border-slate-200'}}
   const {l,c}=map[role]||map.professor
   return <Badge className={c}><Shield size={10}/>{l}</Badge>
+}
+function InfoRow({ icon: Icon, label, value }) {
+  if (!value) return null
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+        <Icon size={13} className="text-slate-500"/>
+      </div>
+      <div>
+        <p className="text-xs text-slate-400">{label}</p>
+        <p className="text-sm text-slate-700 font-medium">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+// ─── SERVIDOR MODAL (Ficha Completa) ─────────────────────────────────────────
+
+function ServidorModal({ servidorId, nomePreview, onClose }) {
+  const { servidor, matriculas, vinculos, loading } = useServidorDetalhes(servidorId)
+
+  // Agrupar vínculos por escola
+  const vinculosPorEscola = useMemo(() => {
+    const map = {}
+    vinculos.forEach(v => {
+      const key = v.escola || 'Sem escola'
+      if (!map[key]) map[key] = []
+      map[key].push(v)
+    })
+    return map
+  }, [vinculos])
+
+  const nome = servidor?.nome || nomePreview || '...'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e=>e.stopPropagation()}>
+        {/* Header */}
+        <div className="relative bg-slate-950 p-6">
+          <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+            <X size={16} className="text-white"/>
+          </button>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">
+              {initials(nome)}
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white leading-snug">{nome}</h2>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-500/20 text-teal-300">
+                  <UserCircle size={10}/> Servidor
+                </span>
+                {vinculos.length > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
+                    <Building2 size={10}/> {Object.keys(vinculosPorEscola).length} {Object.keys(vinculosPorEscola).length === 1 ? 'escola' : 'escolas'}
+                  </span>
+                )}
+                {matriculas.length > 1 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
+                    <Hash size={10}/> {matriculas.length} matrículas
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-5 max-h-[65vh] overflow-y-auto">
+          {loading ? (
+            <Spinner/>
+          ) : (
+            <>
+              {/* Dados Pessoais */}
+              {(servidor?.data_nascimento || servidor?.email || servidor?.telefone || servidor?.endereco) && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Dados Pessoais</p>
+                  <div className="space-y-2.5">
+                    <InfoRow icon={Calendar} label="Data de Nascimento" value={formatDate(servidor?.data_nascimento)}/>
+                    <InfoRow icon={Mail} label="E-mail" value={servidor?.email}/>
+                    <InfoRow icon={Phone} label="Telefone" value={servidor?.telefone}/>
+                    <InfoRow icon={MapPin} label="Endereço" value={servidor?.endereco}/>
+                  </div>
+                </div>
+              )}
+
+              {/* Matrículas */}
+              {matriculas.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Matrículas</p>
+                  <div className="space-y-2">
+                    {matriculas.map((m, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
+                        <Hash size={14} className="text-slate-400 mt-0.5 shrink-0"/>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-mono font-medium text-slate-800">{m.matricula_raw || m.matricula_norm || '—'}</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {m.data_inicio && <span className="text-xs text-slate-400">Início: {formatDate(m.data_inicio)}</span>}
+                            {m.area_nomeacao && <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">{m.area_nomeacao}</span>}
+                            {m.nivel && <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">Nível {m.nivel}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Vínculos por Escola */}
+              {Object.keys(vinculosPorEscola).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Vínculos / Atuação</p>
+                  <div className="space-y-3">
+                    {Object.entries(vinculosPorEscola).map(([escola, vincs]) => (
+                      <div key={escola} className="border border-slate-100 rounded-2xl overflow-hidden">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100">
+                          <School size={13} className="text-slate-400 shrink-0"/>
+                          <p className="text-xs font-semibold text-slate-600 truncate">{escola}</p>
+                        </div>
+                        <div className="divide-y divide-slate-50">
+                          {vincs.map((v, i) => (
+                            <div key={i} className="p-3 space-y-1.5">
+                              {v.atuacao && (
+                                <div className="flex items-center gap-2">
+                                  <Briefcase size={12} className="text-slate-400 shrink-0"/>
+                                  <p className="text-sm font-medium text-slate-700">{v.atuacao}</p>
+                                </div>
+                              )}
+                              <div className="flex flex-wrap gap-1.5 pl-5">
+                                {v.turno && <Badge className="bg-blue-50 text-blue-600 border-blue-200">{v.turno}</Badge>}
+                                {v.vinculo_empregaticio && <Badge className="bg-slate-100 text-slate-600 border-slate-200">{v.vinculo_empregaticio}</Badge>}
+                                {v.categoria_secao && <Badge className="bg-violet-50 text-violet-600 border-violet-200">{v.categoria_secao}</Badge>}
+                              </div>
+                              {v.formacao && (
+                                <div className="flex items-center gap-2 pl-5">
+                                  <BookOpen size={11} className="text-slate-400 shrink-0"/>
+                                  <p className="text-xs text-slate-500">{v.formacao}</p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sem dados */}
+              {!servidor && !loading && (
+                <div className="text-center py-8 text-slate-400">
+                  <UserCircle size={32} className="mx-auto mb-2 opacity-30"/>
+                  <p className="text-sm">Ficha não encontrada na tabela de servidores</p>
+                  <p className="text-xs mt-1 text-slate-300">Este registro pode ser apenas um professor sem dados complementares</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ─── PROFESSOR MODAL ─────────────────────────────────────────────────────────
@@ -136,24 +307,24 @@ function ProfessorModal({ prof, onClose }) {
 
 // ─── SEARCH OVERLAY ──────────────────────────────────────────────────────────
 
-function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
+function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) {
   const [query,setQuery]=useState('')
-  const [results,setResults]=useState({profs:[],escolas:[]})
+  const [results,setResults]=useState({profs:[],escolas:[],servidores:[]})
   const [searching,setSearching]=useState(false)
   useEffect(()=>{const h=e=>{if(e.key==='Escape')onClose()};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h)},[onClose])
   useEffect(()=>{
-    if(query.length<2){setResults({profs:[],escolas:[]});return}
+    if(query.length<2){setResults({profs:[],escolas:[],servidores:[]});return}
     setSearching(true)
     const t=setTimeout(async()=>{const r=await buscarGlobal(query);setResults(r);setSearching(false)},250)
     return()=>clearTimeout(t)
   },[query])
-  const hasResults=results.profs.length>0||results.escolas.length>0
+  const hasResults=results.profs.length>0||results.escolas.length>0||results.servidores.length>0
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/30 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center gap-3 p-4 border-b border-slate-100">
           {searching?<Loader2 size={16} className="animate-spin text-slate-400 shrink-0"/>:<Search size={16} className="text-slate-400 shrink-0"/>}
-          <input autoFocus className="flex-1 text-base outline-none placeholder:text-slate-300 bg-transparent" placeholder="Buscar professor ou escola..." value={query} onChange={e=>setQuery(e.target.value)}/>
+          <input autoFocus className="flex-1 text-base outline-none placeholder:text-slate-300 bg-transparent" placeholder="Buscar professor, servidor ou escola..." value={query} onChange={e=>setQuery(e.target.value)}/>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition-colors"><X size={16} className="text-slate-400"/></button>
         </div>
         <div className="max-h-96 overflow-y-auto">
@@ -185,6 +356,21 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
               })}
             </div>
           )}
+          {results.servidores && results.servidores.length>0&&(
+            <div className="p-2">
+              <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Servidores</p>
+              {results.servidores.map(s=>(
+                <button key={s.id} onClick={()=>{onOpenServidor(s);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
+                  <AvatarCircle name={s.nome} size="sm"/>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-700">{s.nome}</p>
+                    <p className="text-xs text-slate-400">{s.email || (s.data_nascimento ? formatDate(s.data_nascimento) : 'Servidor')}</p>
+                  </div>
+                  <Badge className="bg-teal-50 text-teal-600 border-teal-200 ml-auto shrink-0">Servidor</Badge>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -208,7 +394,7 @@ function Dashboard({ onSelectSchool }) {
           {label:'Escolas',val:stats?.totalEscolas,icon:School,bg:'bg-slate-50',text:'text-slate-800',ib:'bg-slate-200 text-slate-600'},
           {label:'Professores',val:stats?.totalProfs,icon:Users,bg:'bg-blue-50',text:'text-blue-800',ib:'bg-blue-200 text-blue-700'},
           {label:'Total Nomeações',val:stats?.totalNomeacoes,icon:Briefcase,bg:'bg-violet-50',text:'text-violet-800',ib:'bg-violet-200 text-violet-700'},
-          {label:'Duplas Nomeações',val:stats?.duplos,icon:ArrowRightLeft,bg:'bg-amber-50',text:'text-amber-800',ib:'bg-amber-200 text-amber-700'},
+          {label:'Servidores',val:stats?.totalServidores,icon:UserCircle,bg:'bg-teal-50',text:'text-teal-800',ib:'bg-teal-200 text-teal-700'},
         ].map(({label,val,icon:Icon,bg,text,ib})=>(
           <div key={label} className={`${bg} rounded-2xl p-5`}>
             <div className={`w-9 h-9 rounded-xl ${ib} flex items-center justify-center mb-3`}><Icon size={16}/></div>
@@ -354,7 +540,6 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
   )
 }
 
-
 // ─── PROFESSORES LIST ────────────────────────────────────────────────────────
 
 function ProfessoresList({ onOpenProf }) {
@@ -362,199 +547,61 @@ function ProfessoresList({ onOpenProf }) {
   const {escolas}=useEscolas()
   const [search,setSearch]=useState('')
   const [escolaFiltro,setEscolaFiltro]=useState('Todas')
-  const [modalidadeFiltro,setModalidadeFiltro]=useState('Todas')
   const [statusFiltro,setStatusFiltro]=useState('Todos')
   const [vinculoFiltro,setVinculoFiltro]=useState('Todos')
-  const [apenasDouble,setApenasDouble]=useState(false)
-  const [filtersOpen,setFiltersOpen]=useState(false)
-
-  // Escolas agrupadas por modalidade para o select
-  const escolasPorModalidade=useMemo(()=>{
-    const grupos={'EMEF':[],'EMEI':[],'EMEF Campo':[]}
-    escolas.forEach(e=>{if(grupos[e.tipo])grupos[e.tipo].push(e)})
-    return grupos
-  },[escolas])
-
-  // Escolas filtradas pela modalidade selecionada
-  const escolasFiltradas=useMemo(()=>{
-    if(modalidadeFiltro==='Todas')return escolas
-    return escolas.filter(e=>e.tipo===modalidadeFiltro)
-  },[escolas,modalidadeFiltro])
-
-  // Reseta escola se mudar modalidade e escola não pertencer mais
-  useEffect(()=>{
-    if(escolaFiltro!=='Todas'&&!escolasFiltradas.find(e=>e.name===escolaFiltro)){
-      setEscolaFiltro('Todas')
-    }
-  },[modalidadeFiltro,escolasFiltradas,escolaFiltro])
-
-  const hasActiveFilters=modalidadeFiltro!=='Todas'||statusFiltro!=='Todos'||vinculoFiltro!=='Todos'||apenasDouble||escolaFiltro!=='Todas'
-
-  function clearFilters(){
-    setModalidadeFiltro('Todas')
-    setEscolaFiltro('Todas')
-    setStatusFiltro('Todos')
-    setVinculoFiltro('Todos')
-    setApenasDouble(false)
-    setSearch('')
-  }
+  const [duplosOnly,setDuplosOnly]=useState(false)
 
   const filtered=useMemo(()=>{
     const q=search.toLowerCase()
     return professores.filter(p=>{
-      // Busca por nome
       if(search!==''&&!p.nome.toLowerCase().includes(q))return false
-      // Status
-      if(statusFiltro!=='Todos'&&p.status!==statusFiltro)return false
-      // Escola
       if(escolaFiltro!=='Todas'&&!(p.nomeacoes??[]).some(n=>n.escola?.name===escolaFiltro))return false
-      // Modalidade
-      if(modalidadeFiltro!=='Todas'&&!(p.nomeacoes??[]).some(n=>n.escola?.tipo===modalidadeFiltro))return false
-      // Vínculo
+      if(statusFiltro!=='Todos'&&p.status!==statusFiltro)return false
       if(vinculoFiltro!=='Todos'&&!(p.nomeacoes??[]).some(n=>n.tipo_vinculo===vinculoFiltro))return false
-      // Dupla nomeação
-      const escIds=new Set((p.nomeacoes??[]).map(n=>n.escola?.id).filter(Boolean))
-      if(apenasDouble&&escIds.size<2)return false
+      if(duplosOnly&&(p.nomeacoes??[]).length<2)return false
       return true
     })
-  },[professores,search,escolaFiltro,modalidadeFiltro,statusFiltro,vinculoFiltro,apenasDouble])
+  },[professores,search,escolaFiltro,statusFiltro,vinculoFiltro,duplosOnly])
+
+  const vinculos=[...new Set((professores.flatMap(p=>(p.nomeacoes??[]).map(n=>n.tipo_vinculo)).filter(Boolean)))]
 
   if(loading)return<Spinner/>
   return (
-    <div className="space-y-5">
-      {/* Header */}
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Todos os Professores</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{professores.length} cadastrados na rede</p>
-        </div>
+        <div><h1 className="text-xl font-semibold text-slate-900">Todos os Professores</h1><p className="text-sm text-slate-500 mt-0.5">{professores.length} cadastrados na rede</p></div>
         <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" title="Recarregar"><RefreshCw size={16} className="text-slate-500"/></button>
       </div>
-
-      {/* Busca + botão filtros */}
-      <div className="flex gap-2">
-        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 flex-1">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2">
           <Search size={15} className="text-slate-400"/>
-          <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar professor pelo nome..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar professor..." value={search} onChange={e=>setSearch(e.target.value)}/>
           {search&&<button onClick={()=>setSearch('')}><X size={14} className="text-slate-400"/></button>}
         </div>
-        <button
-          onClick={()=>setFiltersOpen(!filtersOpen)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all border ${filtersOpen||hasActiveFilters?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-        >
-          <SlidersHorizontal size={15}/>
-          Filtros
-          {hasActiveFilters&&<span className="w-5 h-5 rounded-full bg-white/20 text-xs flex items-center justify-center font-semibold">
-            {[modalidadeFiltro!=='Todas',statusFiltro!=='Todos',vinculoFiltro!=='Todos',apenasDouble,escolaFiltro!=='Todas'].filter(Boolean).length}
-          </span>}
-        </button>
-      </div>
-
-      {/* Painel de filtros */}
-      {filtersOpen&&(
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-            {/* Modalidade */}
-            <div>
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Modalidade</label>
-              <div className="flex flex-wrap gap-1.5">
-                {['Todas','EMEF','EMEI','EMEF Campo'].map(t=>(
-                  <button key={t} onClick={()=>setModalidadeFiltro(t)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${modalidadeFiltro===t?'bg-slate-900 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Status</label>
-              <div className="flex flex-wrap gap-1.5">
-                {['Todos','Ativo','Afastado'].map(s=>(
-                  <button key={s} onClick={()=>setStatusFiltro(s)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${statusFiltro===s?'bg-slate-900 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Vínculo */}
-            <div>
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Tipo de Vínculo</label>
-              <div className="flex flex-wrap gap-1.5">
-                {['Todos','Efetivo','Designação','Contratado'].map(v=>(
-                  <button key={v} onClick={()=>setVinculoFiltro(v)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${vinculoFiltro===v?'bg-slate-900 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Escola */}
-            <div className="sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Escola</label>
-              <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
-                <option value="Todas">Todas as escolas</option>
-                {['EMEF','EMEI','EMEF Campo'].map(tipo=>{
-                  const lista=escolasFiltradas.filter(e=>e.tipo===tipo)
-                  if(lista.length===0)return null
-                  return(
-                    <optgroup key={tipo} label={tipo}>
-                      {lista.map(e=><option key={e.id}>{e.name}</option>)}
-                    </optgroup>
-                  )
-                })}
-              </select>
-            </div>
-
-            {/* Dupla nomeação */}
-            <div className="flex items-end">
-              <label className="flex items-center gap-2.5 cursor-pointer group">
-                <div
-                  onClick={()=>setApenasDouble(!apenasDouble)}
-                  className={`w-10 h-6 rounded-full transition-all flex items-center px-0.5 ${apenasDouble?'bg-slate-900':'bg-slate-200'}`}>
-                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-all ${apenasDouble?'translate-x-4':'translate-x-0'}`}/>
-                </div>
-                <span className="text-sm text-slate-600 font-medium">Apenas dupla nomeação</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Limpar filtros */}
-          {hasActiveFilters&&(
-            <div className="pt-2 border-t border-slate-100">
-              <button onClick={clearFilters} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
-                <X size={13}/> Limpar todos os filtros
-              </button>
-            </div>
-          )}
+        <div className="flex flex-wrap gap-2">
+          <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+            <option>Todas</option>
+            {escolas.map(e=><option key={e.id}>{e.name}</option>)}
+          </select>
+          <select value={statusFiltro} onChange={e=>setStatusFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+            <option>Todos</option>
+            <option>Ativo</option>
+            <option>Inativo</option>
+          </select>
+          <select value={vinculoFiltro} onChange={e=>setVinculoFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+            <option>Todos</option>
+            {vinculos.map(v=><option key={v}>{v}</option>)}
+          </select>
+          <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 cursor-pointer hover:bg-slate-200 transition-colors">
+            <input type="checkbox" checked={duplosOnly} onChange={e=>setDuplosOnly(e.target.checked)} className="rounded"/>
+            Apenas 2 escolas
+          </label>
         </div>
-      )}
-
-      {/* Contador */}
-      <p className="text-xs text-slate-400">
-        {filtered.length} professor{filtered.length!==1?'es':''} encontrado{filtered.length!==1?'s':''}
-        {hasActiveFilters&&<span className="ml-1 text-slate-300">· com filtros ativos</span>}
-      </p>
-
-      {/* Lista */}
+      </div>
+      <p className="text-xs text-slate-400">{filtered.length} professor{filtered.length!==1?'es':''} encontrado{filtered.length!==1?'s':''}</p>
       <div className="space-y-2">
-        {filtered.length===0&&(
-          <div className="text-center py-16 text-slate-400">
-            <Users size={32} className="mx-auto mb-2 opacity-30"/>
-            <p className="text-sm">Nenhum professor encontrado</p>
-            {hasActiveFilters&&<button onClick={clearFilters} className="mt-2 text-xs text-slate-500 underline">Limpar filtros</button>}
-          </div>
-        )}
         {filtered.map(prof=>{
           const esc=[...new Set((prof.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean))]
-          const tipos=[...new Set((prof.nomeacoes??[]).map(n=>n.escola?.tipo).filter(Boolean))]
-          const vinculos=[...new Set((prof.nomeacoes??[]).map(n=>n.tipo_vinculo).filter(Boolean))]
           return (
             <div key={prof.id} onClick={()=>onOpenProf(prof)} className="group flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all">
               <AvatarCircle name={prof.nome}/>
@@ -562,8 +609,6 @@ function ProfessoresList({ onOpenProf }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-semibold text-slate-800">{prof.nome}</p>
                   {esc.length>1&&<Badge className="bg-blue-50 text-blue-600 border-blue-200"><Briefcase size={10}/> 2 escolas</Badge>}
-                  {tipos.map(t=><Badge key={t} className={TIPO_COLORS[t]}>{t}</Badge>)}
-                  {vinculos.filter(v=>v&&v!=='Efetivo').map(v=><Badge key={v} className="bg-amber-50 text-amber-700 border-amber-200">{v}</Badge>)}
                   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs ${prof.status==='Ativo'?'text-emerald-600':'text-amber-600'}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${prof.status==='Ativo'?'bg-emerald-500':'bg-amber-400'}`}/>{prof.status}
                   </span>
@@ -574,6 +619,96 @@ function ProfessoresList({ onOpenProf }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ─── SERVIDORES LIST ─────────────────────────────────────────────────────────
+
+function ServidoresList({ onOpenServidor }) {
+  const { servidores, loading, reload } = useServidores()
+  const [search, setSearch] = useState('')
+  const [escolaFiltro, setEscolaFiltro] = useState('Todas')
+  const [atuacaoFiltro, setAtuacaoFiltro] = useState('Todas')
+
+  const escolas = useMemo(() => {
+    const s = new Set()
+    servidores.forEach(sv => (sv.servidor_vinculos ?? []).forEach(v => { if(v.escola) s.add(v.escola) }))
+    return [...s].sort()
+  }, [servidores])
+
+  const atuacoes = useMemo(() => {
+    const s = new Set()
+    servidores.forEach(sv => (sv.servidor_vinculos ?? []).forEach(v => { if(v.atuacao) s.add(v.atuacao) }))
+    return [...s].sort()
+  }, [servidores])
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return servidores.filter(sv => {
+      if (search !== '' && !sv.nome.toLowerCase().includes(q)) return false
+      if (escolaFiltro !== 'Todas' && !(sv.servidor_vinculos ?? []).some(v => v.escola === escolaFiltro)) return false
+      if (atuacaoFiltro !== 'Todas' && !(sv.servidor_vinculos ?? []).some(v => v.atuacao === atuacaoFiltro)) return false
+      return true
+    })
+  }, [servidores, search, escolaFiltro, atuacaoFiltro])
+
+  if (loading) return <Spinner/>
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Servidores</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{servidores.length} servidores cadastrados</p>
+        </div>
+        <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><RefreshCw size={16} className="text-slate-500"/></button>
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2">
+          <Search size={15} className="text-slate-400"/>
+          <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar servidor..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          {search&&<button onClick={()=>setSearch('')}><X size={14} className="text-slate-400"/></button>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+            <option>Todas</option>
+            {escolas.map(e=><option key={e}>{e}</option>)}
+          </select>
+          <select value={atuacaoFiltro} onChange={e=>setAtuacaoFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+            <option>Todas</option>
+            {atuacoes.map(a=><option key={a}>{a}</option>)}
+          </select>
+        </div>
+      </div>
+      <p className="text-xs text-slate-400">{filtered.length} servidor{filtered.length!==1?'es':''} encontrado{filtered.length!==1?'s':''}</p>
+      <div className="space-y-2">
+        {filtered.map(sv => {
+          const vinculos = sv.servidor_vinculos ?? []
+          const escolas = [...new Set(vinculos.map(v => v.escola).filter(Boolean))]
+          const atuacoes = [...new Set(vinculos.map(v => v.atuacao).filter(Boolean))]
+          return (
+            <div key={sv.id} onClick={() => onOpenServidor(sv)} className="group flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all">
+              <AvatarCircle name={sv.nome}/>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-slate-800">{sv.nome}</p>
+                  {escolas.length > 1 && <Badge className="bg-blue-50 text-blue-600 border-blue-200"><Building2 size={10}/> {escolas.length} escolas</Badge>}
+                </div>
+                <p className="text-xs text-slate-400 truncate mt-0.5">
+                  {atuacoes.length > 0 ? atuacoes.join(' · ') : escolas.join(' · ') || 'Sem vínculo'}
+                </p>
+              </div>
+              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0"/>
+            </div>
+          )
+        })}
+        {filtered.length === 0 && (
+          <div className="text-center py-16 text-slate-400">
+            <UserCircle size={32} className="mx-auto mb-2 opacity-30"/>
+            <p className="text-sm">Nenhum servidor encontrado</p>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -643,6 +778,7 @@ export default function App() {
   const [view,setView]=useState('dashboard')
   const [selectedSchool,setSelectedSchool]=useState(null)
   const [selectedProf,setSelectedProf]=useState(null)
+  const [selectedServidor,setSelectedServidor]=useState(null)
   const [searchOpen,setSearchOpen]=useState(false)
   const [sidebarOpen,setSidebarOpen]=useState(true)
 
@@ -662,6 +798,7 @@ export default function App() {
     {id:'dashboard',label:'Dashboard',icon:Home},
     {id:'schools',label:'Unidades',icon:School},
     {id:'professores',label:'Professores',icon:Users},
+    {id:'servidores',label:'Servidores',icon:UserCircle},
     {id:'efe',label:'Efetividade',icon:CheckCircle2},
     {id:'relatorios',label:'Relatórios',icon:FileText},
   ]
@@ -700,7 +837,7 @@ export default function App() {
         <header className="h-14 bg-white border-b border-slate-100 flex items-center gap-3 px-4 shrink-0 sticky top-0 z-20">
           <button onClick={()=>setSidebarOpen(!sidebarOpen)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><Menu size={17} className="text-slate-500"/></button>
           <button onClick={()=>setSearchOpen(true)} className="flex-1 max-w-sm flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-400 hover:bg-slate-200 transition-colors">
-            <Search size={14}/><span className="flex-1 text-left">Buscar professor ou escola...</span>
+            <Search size={14}/><span className="flex-1 text-left">Buscar professor, servidor ou escola...</span>
             <kbd className="text-xs bg-white border border-slate-200 px-1.5 py-0.5 rounded-md font-mono">⌘K</kbd>
           </button>
           <div className="ml-auto">
@@ -714,13 +851,15 @@ export default function App() {
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenProf={setSelectedProf}/>}
           {view==='professores'&&<ProfessoresList onOpenProf={setSelectedProf}/>}
+          {view==='servidores'&&<ServidoresList onOpenServidor={sv=>setSelectedServidor(sv)}/>}
           {view==='efe'&&<EfeModule onOpenProf={setSelectedProf}/>}
           {view==='relatorios'&&<div className="flex items-center justify-center h-64 text-slate-400"><div className="text-center"><FileText size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Relatórios · em breve</p></div></div>}
         </main>
       </div>
 
-      {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenProf={p=>{setSelectedProf(p)}}/>}
+      {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenProf={p=>{setSelectedProf(p)}} onOpenServidor={sv=>setSelectedServidor(sv)}/>}
       {selectedProf&&<ProfessorModal prof={selectedProf} onClose={()=>setSelectedProf(null)}/>}
+      {selectedServidor&&<ServidorModal servidorId={selectedServidor.id} nomePreview={selectedServidor.nome} onClose={()=>setSelectedServidor(null)}/>}
     </div>
   )
 }
