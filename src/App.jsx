@@ -3,7 +3,7 @@ import {
   Search, School, Users, Home, FileText, LogOut,
   CheckCircle2, AlertCircle, ArrowRightLeft, X,
   Menu, ChevronRight, GraduationCap, Briefcase,
-  Loader2, RefreshCw, Shield
+  Loader2, RefreshCw, Shield, SlidersHorizontal
 } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
@@ -354,6 +354,7 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
   )
 }
 
+
 // ─── PROFESSORES LIST ────────────────────────────────────────────────────────
 
 function ProfessoresList({ onOpenProf }) {
@@ -361,32 +362,199 @@ function ProfessoresList({ onOpenProf }) {
   const {escolas}=useEscolas()
   const [search,setSearch]=useState('')
   const [escolaFiltro,setEscolaFiltro]=useState('Todas')
+  const [modalidadeFiltro,setModalidadeFiltro]=useState('Todas')
+  const [statusFiltro,setStatusFiltro]=useState('Todos')
+  const [vinculoFiltro,setVinculoFiltro]=useState('Todos')
+  const [apenasDouble,setApenasDouble]=useState(false)
+  const [filtersOpen,setFiltersOpen]=useState(false)
+
+  // Escolas agrupadas por modalidade para o select
+  const escolasPorModalidade=useMemo(()=>{
+    const grupos={'EMEF':[],'EMEI':[],'EMEF Campo':[]}
+    escolas.forEach(e=>{if(grupos[e.tipo])grupos[e.tipo].push(e)})
+    return grupos
+  },[escolas])
+
+  // Escolas filtradas pela modalidade selecionada
+  const escolasFiltradas=useMemo(()=>{
+    if(modalidadeFiltro==='Todas')return escolas
+    return escolas.filter(e=>e.tipo===modalidadeFiltro)
+  },[escolas,modalidadeFiltro])
+
+  // Reseta escola se mudar modalidade e escola não pertencer mais
+  useEffect(()=>{
+    if(escolaFiltro!=='Todas'&&!escolasFiltradas.find(e=>e.name===escolaFiltro)){
+      setEscolaFiltro('Todas')
+    }
+  },[modalidadeFiltro,escolasFiltradas,escolaFiltro])
+
+  const hasActiveFilters=modalidadeFiltro!=='Todas'||statusFiltro!=='Todos'||vinculoFiltro!=='Todos'||apenasDouble||escolaFiltro!=='Todas'
+
+  function clearFilters(){
+    setModalidadeFiltro('Todas')
+    setEscolaFiltro('Todas')
+    setStatusFiltro('Todos')
+    setVinculoFiltro('Todos')
+    setApenasDouble(false)
+    setSearch('')
+  }
+
   const filtered=useMemo(()=>{
     const q=search.toLowerCase()
-    return professores.filter(p=>(search===''||p.nome.toLowerCase().includes(q))&&(escolaFiltro==='Todas'||(p.nomeacoes??[]).some(n=>n.escola?.name===escolaFiltro)))
-  },[professores,search,escolaFiltro])
+    return professores.filter(p=>{
+      // Busca por nome
+      if(search!==''&&!p.nome.toLowerCase().includes(q))return false
+      // Status
+      if(statusFiltro!=='Todos'&&p.status!==statusFiltro)return false
+      // Escola
+      if(escolaFiltro!=='Todas'&&!(p.nomeacoes??[]).some(n=>n.escola?.name===escolaFiltro))return false
+      // Modalidade
+      if(modalidadeFiltro!=='Todas'&&!(p.nomeacoes??[]).some(n=>n.escola?.tipo===modalidadeFiltro))return false
+      // Vínculo
+      if(vinculoFiltro!=='Todos'&&!(p.nomeacoes??[]).some(n=>n.tipo_vinculo===vinculoFiltro))return false
+      // Dupla nomeação
+      const escIds=new Set((p.nomeacoes??[]).map(n=>n.escola?.id).filter(Boolean))
+      if(apenasDouble&&escIds.size<2)return false
+      return true
+    })
+  },[professores,search,escolaFiltro,modalidadeFiltro,statusFiltro,vinculoFiltro,apenasDouble])
+
   if(loading)return<Spinner/>
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div><h1 className="text-xl font-semibold text-slate-900">Todos os Professores</h1><p className="text-sm text-slate-500 mt-0.5">{professores.length} cadastrados na rede</p></div>
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Todos os Professores</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{professores.length} cadastrados na rede</p>
+        </div>
         <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" title="Recarregar"><RefreshCw size={16} className="text-slate-500"/></button>
       </div>
-      <div className="flex flex-col sm:flex-row gap-3">
+
+      {/* Busca + botão filtros */}
+      <div className="flex gap-2">
         <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 flex-1">
           <Search size={15} className="text-slate-400"/>
-          <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar professor..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar professor pelo nome..." value={search} onChange={e=>setSearch(e.target.value)}/>
           {search&&<button onClick={()=>setSearch('')}><X size={14} className="text-slate-400"/></button>}
         </div>
-        <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
-          <option>Todas</option>
-          {escolas.map(e=><option key={e.id}>{e.name}</option>)}
-        </select>
+        <button
+          onClick={()=>setFiltersOpen(!filtersOpen)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all border ${filtersOpen||hasActiveFilters?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+        >
+          <SlidersHorizontal size={15}/>
+          Filtros
+          {hasActiveFilters&&<span className="w-5 h-5 rounded-full bg-white/20 text-xs flex items-center justify-center font-semibold">
+            {[modalidadeFiltro!=='Todas',statusFiltro!=='Todos',vinculoFiltro!=='Todos',apenasDouble,escolaFiltro!=='Todas'].filter(Boolean).length}
+          </span>}
+        </button>
       </div>
-      <p className="text-xs text-slate-400">{filtered.length} professor{filtered.length!==1?'es':''} encontrado{filtered.length!==1?'s':''}</p>
+
+      {/* Painel de filtros */}
+      {filtersOpen&&(
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            {/* Modalidade */}
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Modalidade</label>
+              <div className="flex flex-wrap gap-1.5">
+                {['Todas','EMEF','EMEI','EMEF Campo'].map(t=>(
+                  <button key={t} onClick={()=>setModalidadeFiltro(t)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${modalidadeFiltro===t?'bg-slate-900 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Status</label>
+              <div className="flex flex-wrap gap-1.5">
+                {['Todos','Ativo','Afastado'].map(s=>(
+                  <button key={s} onClick={()=>setStatusFiltro(s)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${statusFiltro===s?'bg-slate-900 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Vínculo */}
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Tipo de Vínculo</label>
+              <div className="flex flex-wrap gap-1.5">
+                {['Todos','Efetivo','Designação','Contratado'].map(v=>(
+                  <button key={v} onClick={()=>setVinculoFiltro(v)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${vinculoFiltro===v?'bg-slate-900 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Escola */}
+            <div className="sm:col-span-2">
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">Escola</label>
+              <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+                <option value="Todas">Todas as escolas</option>
+                {['EMEF','EMEI','EMEF Campo'].map(tipo=>{
+                  const lista=escolasFiltradas.filter(e=>e.tipo===tipo)
+                  if(lista.length===0)return null
+                  return(
+                    <optgroup key={tipo} label={tipo}>
+                      {lista.map(e=><option key={e.id}>{e.name}</option>)}
+                    </optgroup>
+                  )
+                })}
+              </select>
+            </div>
+
+            {/* Dupla nomeação */}
+            <div className="flex items-end">
+              <label className="flex items-center gap-2.5 cursor-pointer group">
+                <div
+                  onClick={()=>setApenasDouble(!apenasDouble)}
+                  className={`w-10 h-6 rounded-full transition-all flex items-center px-0.5 ${apenasDouble?'bg-slate-900':'bg-slate-200'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-all ${apenasDouble?'translate-x-4':'translate-x-0'}`}/>
+                </div>
+                <span className="text-sm text-slate-600 font-medium">Apenas dupla nomeação</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Limpar filtros */}
+          {hasActiveFilters&&(
+            <div className="pt-2 border-t border-slate-100">
+              <button onClick={clearFilters} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors">
+                <X size={13}/> Limpar todos os filtros
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Contador */}
+      <p className="text-xs text-slate-400">
+        {filtered.length} professor{filtered.length!==1?'es':''} encontrado{filtered.length!==1?'s':''}
+        {hasActiveFilters&&<span className="ml-1 text-slate-300">· com filtros ativos</span>}
+      </p>
+
+      {/* Lista */}
       <div className="space-y-2">
+        {filtered.length===0&&(
+          <div className="text-center py-16 text-slate-400">
+            <Users size={32} className="mx-auto mb-2 opacity-30"/>
+            <p className="text-sm">Nenhum professor encontrado</p>
+            {hasActiveFilters&&<button onClick={clearFilters} className="mt-2 text-xs text-slate-500 underline">Limpar filtros</button>}
+          </div>
+        )}
         {filtered.map(prof=>{
           const esc=[...new Set((prof.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean))]
+          const tipos=[...new Set((prof.nomeacoes??[]).map(n=>n.escola?.tipo).filter(Boolean))]
+          const vinculos=[...new Set((prof.nomeacoes??[]).map(n=>n.tipo_vinculo).filter(Boolean))]
           return (
             <div key={prof.id} onClick={()=>onOpenProf(prof)} className="group flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all">
               <AvatarCircle name={prof.nome}/>
@@ -394,6 +562,8 @@ function ProfessoresList({ onOpenProf }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-semibold text-slate-800">{prof.nome}</p>
                   {esc.length>1&&<Badge className="bg-blue-50 text-blue-600 border-blue-200"><Briefcase size={10}/> 2 escolas</Badge>}
+                  {tipos.map(t=><Badge key={t} className={TIPO_COLORS[t]}>{t}</Badge>)}
+                  {vinculos.filter(v=>v&&v!=='Efetivo').map(v=><Badge key={v} className="bg-amber-50 text-amber-700 border-amber-200">{v}</Badge>)}
                   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs ${prof.status==='Ativo'?'text-emerald-600':'text-amber-600'}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${prof.status==='Ativo'?'bg-emerald-500':'bg-amber-400'}`}/>{prof.status}
                   </span>
