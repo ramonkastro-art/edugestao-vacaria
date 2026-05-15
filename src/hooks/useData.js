@@ -216,7 +216,7 @@ export function useServidorDetalhes(servidorId) {
       .select(`
         *,
         servidor_matriculas ( * ),
-        servidor_vinculos ( *, escola:escolas ( id, name, tipo ) )
+        servidor_vinculos ( * )
       `)
       .eq('id', servidorId)
       .single()
