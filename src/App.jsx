@@ -3,15 +3,14 @@ import {
   Search, School, Users, Home, FileText, LogOut,
   CheckCircle2, AlertCircle, ArrowRightLeft, X,
   Menu, ChevronRight, GraduationCap, Briefcase,
-  Loader2, RefreshCw, Shield, UserCircle, Phone,
-  Mail, MapPin, Calendar, Hash, BookOpen, Building2
+  Loader2, RefreshCw, Shield, UserCog, Phone, MapPin, Calendar, Hash
 } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import {
   useEscolas, useProfessores, useProfessoresByEscola,
   useEfetividade, useDashboardStats, buscarGlobal,
-  useServidorDetalhes, useServidores
+  useServidores, useServidorDetalhes
 } from './hooks/useData'
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -23,6 +22,15 @@ const TIPO_COLORS = {
 }
 const OCORRENCIAS = ['Falta','Licença Médica','Licença Maternidade','Licença Prêmio','Substituição','Afastamento']
 
+// Atuações que são docentes — serão EXCLUÍDAS da aba Servidores
+const ATUACOES_DOCENTES = ['prof','dire','coord','vice','orient','superv','pedagog','docent']
+
+function ehDocente(atuacao) {
+  if (!atuacao) return false
+  const a = atuacao.toLowerCase()
+  return ATUACOES_DOCENTES.some(k => a.includes(k))
+}
+
 function mesAnoAtual() {
   const n = new Date()
   return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`
@@ -32,13 +40,6 @@ function mesAnoLabel(s) {
   const [ano,mes] = s.split('-')
   const m=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
   return `${m[parseInt(mes)-1]} / ${ano}`
-}
-function formatDate(d) {
-  if (!d) return '—'
-  try {
-    const dt = new Date(d + 'T00:00:00')
-    return dt.toLocaleDateString('pt-BR')
-  } catch { return d }
 }
 
 // ─── UI HELPERS ──────────────────────────────────────────────────────────────
@@ -61,168 +62,6 @@ function RoleBadge({ role }) {
   const map={secretaria:{l:'Secretaria',c:'bg-violet-50 text-violet-700 border-violet-200'},rh:{l:'RH',c:'bg-blue-50 text-blue-700 border-blue-200'},diretor:{l:'Diretor',c:'bg-emerald-50 text-emerald-700 border-emerald-200'},professor:{l:'Professor',c:'bg-slate-100 text-slate-600 border-slate-200'}}
   const {l,c}=map[role]||map.professor
   return <Badge className={c}><Shield size={10}/>{l}</Badge>
-}
-function InfoRow({ icon: Icon, label, value }) {
-  if (!value) return null
-  return (
-    <div className="flex items-start gap-3">
-      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-        <Icon size={13} className="text-slate-500"/>
-      </div>
-      <div>
-        <p className="text-xs text-slate-400">{label}</p>
-        <p className="text-sm text-slate-700 font-medium">{value}</p>
-      </div>
-    </div>
-  )
-}
-
-// ─── SERVIDOR MODAL (Ficha Completa) ─────────────────────────────────────────
-
-function ServidorModal({ servidorId, nomePreview, onClose }) {
-  const { servidor, matriculas, vinculos, loading } = useServidorDetalhes(servidorId)
-
-  // Agrupar vínculos por escola
-  const vinculosPorEscola = useMemo(() => {
-    const map = {}
-    vinculos.forEach(v => {
-      const key = v.escola || 'Sem escola'
-      if (!map[key]) map[key] = []
-      map[key].push(v)
-    })
-    return map
-  }, [vinculos])
-
-  const nome = servidor?.nome || nomePreview || '...'
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e=>e.stopPropagation()}>
-        {/* Header */}
-        <div className="relative bg-slate-950 p-6">
-          <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-            <X size={16} className="text-white"/>
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">
-              {initials(nome)}
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white leading-snug">{nome}</h2>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-teal-500/20 text-teal-300">
-                  <UserCircle size={10}/> Servidor
-                </span>
-                {vinculos.length > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
-                    <Building2 size={10}/> {Object.keys(vinculosPorEscola).length} {Object.keys(vinculosPorEscola).length === 1 ? 'escola' : 'escolas'}
-                  </span>
-                )}
-                {matriculas.length > 1 && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
-                    <Hash size={10}/> {matriculas.length} matrículas
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="p-5 space-y-5 max-h-[65vh] overflow-y-auto">
-          {loading ? (
-            <Spinner/>
-          ) : (
-            <>
-              {/* Dados Pessoais */}
-              {(servidor?.data_nascimento || servidor?.email || servidor?.telefone || servidor?.endereco) && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Dados Pessoais</p>
-                  <div className="space-y-2.5">
-                    <InfoRow icon={Calendar} label="Data de Nascimento" value={formatDate(servidor?.data_nascimento)}/>
-                    <InfoRow icon={Mail} label="E-mail" value={servidor?.email}/>
-                    <InfoRow icon={Phone} label="Telefone" value={servidor?.telefone}/>
-                    <InfoRow icon={MapPin} label="Endereço" value={servidor?.endereco}/>
-                  </div>
-                </div>
-              )}
-
-              {/* Matrículas */}
-              {matriculas.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Matrículas</p>
-                  <div className="space-y-2">
-                    {matriculas.map((m, i) => (
-                      <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
-                        <Hash size={14} className="text-slate-400 mt-0.5 shrink-0"/>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-mono font-medium text-slate-800">{m.matricula_raw || m.matricula_norm || '—'}</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {m.data_inicio && <span className="text-xs text-slate-400">Início: {formatDate(m.data_inicio)}</span>}
-                            {m.area_nomeacao && <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">{m.area_nomeacao}</span>}
-                            {m.nivel && <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">Nível {m.nivel}</span>}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Vínculos por Escola */}
-              {Object.keys(vinculosPorEscola).length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Vínculos / Atuação</p>
-                  <div className="space-y-3">
-                    {Object.entries(vinculosPorEscola).map(([escola, vincs]) => (
-                      <div key={escola} className="border border-slate-100 rounded-2xl overflow-hidden">
-                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100">
-                          <School size={13} className="text-slate-400 shrink-0"/>
-                          <p className="text-xs font-semibold text-slate-600 truncate">{escola}</p>
-                        </div>
-                        <div className="divide-y divide-slate-50">
-                          {vincs.map((v, i) => (
-                            <div key={i} className="p-3 space-y-1.5">
-                              {v.atuacao && (
-                                <div className="flex items-center gap-2">
-                                  <Briefcase size={12} className="text-slate-400 shrink-0"/>
-                                  <p className="text-sm font-medium text-slate-700">{v.atuacao}</p>
-                                </div>
-                              )}
-                              <div className="flex flex-wrap gap-1.5 pl-5">
-                                {v.turno && <Badge className="bg-blue-50 text-blue-600 border-blue-200">{v.turno}</Badge>}
-                                {v.vinculo_empregaticio && <Badge className="bg-slate-100 text-slate-600 border-slate-200">{v.vinculo_empregaticio}</Badge>}
-                                {v.categoria_secao && <Badge className="bg-violet-50 text-violet-600 border-violet-200">{v.categoria_secao}</Badge>}
-                              </div>
-                              {v.formacao && (
-                                <div className="flex items-center gap-2 pl-5">
-                                  <BookOpen size={11} className="text-slate-400 shrink-0"/>
-                                  <p className="text-xs text-slate-500">{v.formacao}</p>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Sem dados */}
-              {!servidor && !loading && (
-                <div className="text-center py-8 text-slate-400">
-                  <UserCircle size={32} className="mx-auto mb-2 opacity-30"/>
-                  <p className="text-sm">Ficha não encontrada na tabela de servidores</p>
-                  <p className="text-xs mt-1 text-slate-300">Este registro pode ser apenas um professor sem dados complementares</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ─── PROFESSOR MODAL ─────────────────────────────────────────────────────────
@@ -305,9 +144,143 @@ function ProfessorModal({ prof, onClose }) {
   )
 }
 
+// ─── SERVIDOR MODAL ──────────────────────────────────────────────────────────
+
+function ServidorModal({ servidorId, onClose }) {
+  const { servidor, loading, error } = useServidorDetalhes(servidorId)
+
+  if (!servidorId) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e=>e.stopPropagation()}>
+        {/* Header */}
+        <div className="relative bg-slate-950 p-6">
+          <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+            <X size={16} className="text-white"/>
+          </button>
+          {loading ? (
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center"><Loader2 size={20} className="animate-spin text-white/50"/></div>
+              <p className="text-white/50 text-sm">Carregando…</p>
+            </div>
+          ) : error ? (
+            <p className="text-red-300 text-sm">Erro ao carregar dados.</p>
+          ) : servidor ? (
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">{initials(servidor.nome)}</div>
+              <div>
+                <h2 className="text-lg font-semibold text-white leading-snug">{servidor.nome}</h2>
+                <p className="text-white/50 text-xs mt-1">Servidor Municipal</p>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Body */}
+        {!loading && !error && servidor && (
+          <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+
+            {/* Dados pessoais */}
+            <div className="space-y-2">
+              {servidor.data_nascimento && (
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+                  <Calendar size={15} className="text-slate-400 shrink-0"/>
+                  <div>
+                    <p className="text-xs text-slate-400">Nascimento</p>
+                    <p className="text-sm font-medium text-slate-700">{new Date(servidor.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                  </div>
+                </div>
+              )}
+              {servidor.telefone && (
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+                  <Phone size={15} className="text-slate-400 shrink-0"/>
+                  <div>
+                    <p className="text-xs text-slate-400">Telefone</p>
+                    <p className="text-sm font-medium text-slate-700">{servidor.telefone}</p>
+                  </div>
+                </div>
+              )}
+              {servidor.endereco && (
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+                  <MapPin size={15} className="text-slate-400 shrink-0"/>
+                  <div>
+                    <p className="text-xs text-slate-400">Endereço</p>
+                    <p className="text-sm font-medium text-slate-700">{servidor.endereco}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Matrículas */}
+            {(servidor.servidor_matriculas ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Matrículas</p>
+                <div className="space-y-2">
+                  {(servidor.servidor_matriculas ?? []).map((m, i) => (
+                    <div key={m.id ?? i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
+                      <Hash size={14} className="text-slate-400 mt-0.5 shrink-0"/>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-mono text-slate-600 break-all">{m.matricula_raw || m.matricula_norm || '—'}</p>
+                        {m.data_inicio && (
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Início: {new Date(m.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Vínculos / Atuações */}
+            {(servidor.servidor_vinculos ?? []).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Atuação / Escola</p>
+                <div className="space-y-2">
+                  {(servidor.servidor_vinculos ?? []).map((v, i) => {
+                    const escola = v.escola ?? {}
+                    // pula linhas de cabeçalho importadas por engano
+                    if (!v.atuacao || v.atuacao.toUpperCase() === 'ATUAÇÃO') return null
+                    return (
+                      <div key={v.id ?? i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
+                        <School size={15} className="text-slate-400 mt-0.5 shrink-0"/>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800 leading-snug">{escola.name || v.escola || '—'}</p>
+                          {v.atuacao && <p className="text-xs text-slate-500 mt-0.5">{v.atuacao}</p>}
+                          {v.vinculo_empregaticio && !/e-?mail/i.test(v.vinculo_empregaticio) && (
+                            <p className="text-xs text-slate-400">{v.vinculo_empregaticio}</p>
+                          )}
+                          {v.turno && !/turno/i.test(v.turno) && (
+                            <p className="text-xs text-slate-400">Turno: {v.turno}</p>
+                          )}
+                          {v.formacao && (
+                            <p className="text-xs text-violet-600 mt-0.5 flex items-center gap-1"><GraduationCap size={11}/>{v.formacao}</p>
+                          )}
+                        </div>
+                        {escola.tipo && <Badge className={TIPO_COLORS[escola.tipo] || 'bg-slate-50 text-slate-600 border-slate-200'}>{escola.tipo}</Badge>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Sem dados */}
+            {(servidor.servidor_vinculos ?? []).length === 0 && (servidor.servidor_matriculas ?? []).length === 0 && (
+              <p className="text-sm text-slate-400 italic text-center py-4">Nenhum vínculo ou matrícula registrado.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── SEARCH OVERLAY ──────────────────────────────────────────────────────────
 
-function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) {
+function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
   const [query,setQuery]=useState('')
   const [results,setResults]=useState({profs:[],escolas:[],servidores:[]})
   const [searching,setSearching]=useState(false)
@@ -318,7 +291,7 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) 
     const t=setTimeout(async()=>{const r=await buscarGlobal(query);setResults(r);setSearching(false)},250)
     return()=>clearTimeout(t)
   },[query])
-  const hasResults=results.profs.length>0||results.escolas.length>0||results.servidores.length>0
+  const hasResults=(results.profs??[]).length>0||(results.escolas??[]).length>0||(results.servidores??[]).length>0
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/30 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden" onClick={e=>e.stopPropagation()}>
@@ -330,10 +303,10 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) 
         <div className="max-h-96 overflow-y-auto">
           {query.length>=2&&!searching&&!hasResults&&<p className="text-center py-10 text-sm text-slate-400">Nenhum resultado para "{query}"</p>}
           {query.length<2&&<p className="text-center py-10 text-sm text-slate-400">Digite ao menos 2 letras para buscar</p>}
-          {results.escolas.length>0&&(
+          {(results.escolas??[]).length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Escolas</p>
-              {results.escolas.map(s=>(
+              {(results.escolas??[]).map(s=>(
                 <button key={s.id} onClick={()=>{onSelectSchool(s);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
                   <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center"><School size={14} className="text-slate-500"/></div>
                   <div><p className="text-sm font-medium text-slate-700">{s.name}</p><p className="text-xs text-slate-400">{s.tipo}</p></div>
@@ -341,10 +314,10 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) 
               ))}
             </div>
           )}
-          {results.profs.length>0&&(
+          {(results.profs??[]).length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Professores</p>
-              {results.profs.map(p=>{
+              {(results.profs??[]).map(p=>{
                 const esc=(p.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean)
                 return (
                   <button key={p.id} onClick={()=>{onOpenProf(p);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
@@ -356,17 +329,13 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) 
               })}
             </div>
           )}
-          {results.servidores && results.servidores.length>0&&(
+          {(results.servidores??[]).length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Servidores</p>
-              {results.servidores.map(s=>(
-                <button key={s.id} onClick={()=>{onOpenServidor(s);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
+              {(results.servidores??[]).map(s=>(
+                <button key={s.id} onClick={()=>{onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
                   <AvatarCircle name={s.nome} size="sm"/>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-700">{s.nome}</p>
-                    <p className="text-xs text-slate-400">{s.email || (s.data_nascimento ? formatDate(s.data_nascimento) : 'Servidor')}</p>
-                  </div>
-                  <Badge className="bg-teal-50 text-teal-600 border-teal-200 ml-auto shrink-0">Servidor</Badge>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-700">{s.nome}</p></div>
                 </button>
               ))}
             </div>
@@ -394,7 +363,7 @@ function Dashboard({ onSelectSchool }) {
           {label:'Escolas',val:stats?.totalEscolas,icon:School,bg:'bg-slate-50',text:'text-slate-800',ib:'bg-slate-200 text-slate-600'},
           {label:'Professores',val:stats?.totalProfs,icon:Users,bg:'bg-blue-50',text:'text-blue-800',ib:'bg-blue-200 text-blue-700'},
           {label:'Total Nomeações',val:stats?.totalNomeacoes,icon:Briefcase,bg:'bg-violet-50',text:'text-violet-800',ib:'bg-violet-200 text-violet-700'},
-          {label:'Servidores',val:stats?.totalServidores,icon:UserCircle,bg:'bg-teal-50',text:'text-teal-800',ib:'bg-teal-200 text-teal-700'},
+          {label:'Duplas Nomeações',val:stats?.duplos,icon:ArrowRightLeft,bg:'bg-amber-50',text:'text-amber-800',ib:'bg-amber-200 text-amber-700'},
         ].map(({label,val,icon:Icon,bg,text,ib})=>(
           <div key={label} className={`${bg} rounded-2xl p-5`}>
             <div className={`w-9 h-9 rounded-xl ${ib} flex items-center justify-center mb-3`}><Icon size={16}/></div>
@@ -516,7 +485,7 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>onOpenProf(prof)}>
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-slate-800">{prof.nome}</p>
-                    {prof.nomeacoesAqui?.length>1&&<Badge className="bg-violet-50 text-violet-600 border-violet-200">{prof.nomeacoesAqui.length}× nomeações</Badge>}
+                    {(prof.nomeacoesAqui??[]).length>1&&<Badge className="bg-violet-50 text-violet-600 border-violet-200">{prof.nomeacoesAqui.length}× nomeações</Badge>}
                     {outra&&<Badge className="bg-blue-50 text-blue-600 border-blue-200"><Briefcase size={10}/> 2ª escola</Badge>}
                   </div>
                   {outra&&<p className="text-xs text-slate-400 mt-0.5 truncate">Também em: {outra.escola?.name}</p>}
@@ -547,24 +516,10 @@ function ProfessoresList({ onOpenProf }) {
   const {escolas}=useEscolas()
   const [search,setSearch]=useState('')
   const [escolaFiltro,setEscolaFiltro]=useState('Todas')
-  const [statusFiltro,setStatusFiltro]=useState('Todos')
-  const [vinculoFiltro,setVinculoFiltro]=useState('Todos')
-  const [duplosOnly,setDuplosOnly]=useState(false)
-
   const filtered=useMemo(()=>{
     const q=search.toLowerCase()
-    return professores.filter(p=>{
-      if(search!==''&&!p.nome.toLowerCase().includes(q))return false
-      if(escolaFiltro!=='Todas'&&!(p.nomeacoes??[]).some(n=>n.escola?.name===escolaFiltro))return false
-      if(statusFiltro!=='Todos'&&p.status!==statusFiltro)return false
-      if(vinculoFiltro!=='Todos'&&!(p.nomeacoes??[]).some(n=>n.tipo_vinculo===vinculoFiltro))return false
-      if(duplosOnly&&(p.nomeacoes??[]).length<2)return false
-      return true
-    })
-  },[professores,search,escolaFiltro,statusFiltro,vinculoFiltro,duplosOnly])
-
-  const vinculos=[...new Set((professores.flatMap(p=>(p.nomeacoes??[]).map(n=>n.tipo_vinculo)).filter(Boolean)))]
-
+    return professores.filter(p=>(search===''||p.nome.toLowerCase().includes(q))&&(escolaFiltro==='Todas'||(p.nomeacoes??[]).some(n=>n.escola?.name===escolaFiltro)))
+  },[professores,search,escolaFiltro])
   if(loading)return<Spinner/>
   return (
     <div className="space-y-6">
@@ -572,31 +527,16 @@ function ProfessoresList({ onOpenProf }) {
         <div><h1 className="text-xl font-semibold text-slate-900">Todos os Professores</h1><p className="text-sm text-slate-500 mt-0.5">{professores.length} cadastrados na rede</p></div>
         <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" title="Recarregar"><RefreshCw size={16} className="text-slate-500"/></button>
       </div>
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 flex-1">
           <Search size={15} className="text-slate-400"/>
           <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar professor..." value={search} onChange={e=>setSearch(e.target.value)}/>
           {search&&<button onClick={()=>setSearch('')}><X size={14} className="text-slate-400"/></button>}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
-            <option>Todas</option>
-            {escolas.map(e=><option key={e.id}>{e.name}</option>)}
-          </select>
-          <select value={statusFiltro} onChange={e=>setStatusFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
-            <option>Todos</option>
-            <option>Ativo</option>
-            <option>Inativo</option>
-          </select>
-          <select value={vinculoFiltro} onChange={e=>setVinculoFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
-            <option>Todos</option>
-            {vinculos.map(v=><option key={v}>{v}</option>)}
-          </select>
-          <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 cursor-pointer hover:bg-slate-200 transition-colors">
-            <input type="checkbox" checked={duplosOnly} onChange={e=>setDuplosOnly(e.target.checked)} className="rounded"/>
-            Apenas 2 escolas
-          </label>
-        </div>
+        <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+          <option>Todas</option>
+          {escolas.map(e=><option key={e.id}>{e.name}</option>)}
+        </select>
       </div>
       <p className="text-xs text-slate-400">{filtered.length} professor{filtered.length!==1?'es':''} encontrado{filtered.length!==1?'s':''}</p>
       <div className="space-y-2">
@@ -627,88 +567,72 @@ function ProfessoresList({ onOpenProf }) {
 // ─── SERVIDORES LIST ─────────────────────────────────────────────────────────
 
 function ServidoresList({ onOpenServidor }) {
-  const { servidores, loading, reload } = useServidores()
   const [search, setSearch] = useState('')
-  const [escolaFiltro, setEscolaFiltro] = useState('Todas')
-  const [atuacaoFiltro, setAtuacaoFiltro] = useState('Todas')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  const escolas = useMemo(() => {
-    const s = new Set()
-    servidores.forEach(sv => (sv.servidor_vinculos ?? []).forEach(v => { if(v.escola) s.add(v.escola) }))
-    return [...s].sort()
-  }, [servidores])
+  // debounce para não disparar query a cada tecla
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
-  const atuacoes = useMemo(() => {
-    const s = new Set()
-    servidores.forEach(sv => (sv.servidor_vinculos ?? []).forEach(v => { if(v.atuacao) s.add(v.atuacao) }))
-    return [...s].sort()
-  }, [servidores])
+  const { servidores, loading, reload } = useServidores({ query: debouncedSearch, limit: 500 })
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    return servidores.filter(sv => {
-      if (search !== '' && !sv.nome.toLowerCase().includes(q)) return false
-      if (escolaFiltro !== 'Todas' && !(sv.servidor_vinculos ?? []).some(v => v.escola === escolaFiltro)) return false
-      if (atuacaoFiltro !== 'Todas' && !(sv.servidor_vinculos ?? []).some(v => v.atuacao === atuacaoFiltro)) return false
-      return true
-    })
-  }, [servidores, search, escolaFiltro, atuacaoFiltro])
+  // Filtra: só mostra quem tem pelo menos 1 vínculo que NÃO seja docente
+  // Como useServidores retorna só id+nome (sem vinculos), usamos a lista completa
+  // e deixamos o filtro de docente para o modal. Aqui mostramos todos os servidores
+  // (a separação professor/servidor é feita pela origem dos dados: professores vêm
+  // da tabela `professores`, servidores vêm da tabela `servidores`).
 
   if (loading) return <Spinner/>
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Servidores</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{servidores.length} servidores cadastrados</p>
+          <p className="text-sm text-slate-500 mt-0.5">Administrativo · Merendeiras · Serventes · e outros</p>
         </div>
-        <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><RefreshCw size={16} className="text-slate-500"/></button>
+        <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" title="Recarregar">
+          <RefreshCw size={16} className="text-slate-500"/>
+        </button>
       </div>
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2">
-          <Search size={15} className="text-slate-400"/>
-          <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar servidor..." value={search} onChange={e=>setSearch(e.target.value)}/>
-          {search&&<button onClick={()=>setSearch('')}><X size={14} className="text-slate-400"/></button>}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
-            <option>Todas</option>
-            {escolas.map(e=><option key={e}>{e}</option>)}
-          </select>
-          <select value={atuacaoFiltro} onChange={e=>setAtuacaoFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
-            <option>Todas</option>
-            {atuacoes.map(a=><option key={a}>{a}</option>)}
-          </select>
-        </div>
+
+      <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2">
+        <Search size={15} className="text-slate-400"/>
+        <input
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+          placeholder="Buscar servidor..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && <button onClick={() => setSearch('')}><X size={14} className="text-slate-400"/></button>}
       </div>
-      <p className="text-xs text-slate-400">{filtered.length} servidor{filtered.length!==1?'es':''} encontrado{filtered.length!==1?'s':''}</p>
+
+      <p className="text-xs text-slate-400">{servidores.length} servidor{servidores.length !== 1 ? 'es' : ''} encontrado{servidores.length !== 1 ? 's' : ''}</p>
+
+      {servidores.length === 0 && !loading && (
+        <div className="text-center py-16 text-slate-400">
+          <UserCog size={32} className="mx-auto mb-2 opacity-30"/>
+          <p className="text-sm">Nenhum servidor encontrado</p>
+          <p className="text-xs mt-1 text-slate-300">Verifique se os dados foram importados no Supabase</p>
+        </div>
+      )}
+
       <div className="space-y-2">
-        {filtered.map(sv => {
-          const vinculos = sv.servidor_vinculos ?? []
-          const escolas = [...new Set(vinculos.map(v => v.escola).filter(Boolean))]
-          const atuacoes = [...new Set(vinculos.map(v => v.atuacao).filter(Boolean))]
-          return (
-            <div key={sv.id} onClick={() => onOpenServidor(sv)} className="group flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all">
-              <AvatarCircle name={sv.nome}/>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-semibold text-slate-800">{sv.nome}</p>
-                  {escolas.length > 1 && <Badge className="bg-blue-50 text-blue-600 border-blue-200"><Building2 size={10}/> {escolas.length} escolas</Badge>}
-                </div>
-                <p className="text-xs text-slate-400 truncate mt-0.5">
-                  {atuacoes.length > 0 ? atuacoes.join(' · ') : escolas.join(' · ') || 'Sem vínculo'}
-                </p>
-              </div>
-              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0"/>
+        {servidores.map(s => (
+          <div
+            key={s.id}
+            onClick={() => onOpenServidor(s.id)}
+            className="group flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all"
+          >
+            <AvatarCircle name={s.nome}/>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800">{s.nome}</p>
             </div>
-          )
-        })}
-        {filtered.length === 0 && (
-          <div className="text-center py-16 text-slate-400">
-            <UserCircle size={32} className="mx-auto mb-2 opacity-30"/>
-            <p className="text-sm">Nenhum servidor encontrado</p>
+            <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0"/>
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
@@ -778,7 +702,7 @@ export default function App() {
   const [view,setView]=useState('dashboard')
   const [selectedSchool,setSelectedSchool]=useState(null)
   const [selectedProf,setSelectedProf]=useState(null)
-  const [selectedServidor,setSelectedServidor]=useState(null)
+  const [selectedServidorId,setSelectedServidorId]=useState(null)
   const [searchOpen,setSearchOpen]=useState(false)
   const [sidebarOpen,setSidebarOpen]=useState(true)
 
@@ -798,7 +722,7 @@ export default function App() {
     {id:'dashboard',label:'Dashboard',icon:Home},
     {id:'schools',label:'Unidades',icon:School},
     {id:'professores',label:'Professores',icon:Users},
-    {id:'servidores',label:'Servidores',icon:UserCircle},
+    {id:'servidores',label:'Servidores',icon:UserCog},
     {id:'efe',label:'Efetividade',icon:CheckCircle2},
     {id:'relatorios',label:'Relatórios',icon:FileText},
   ]
@@ -851,15 +775,15 @@ export default function App() {
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenProf={setSelectedProf}/>}
           {view==='professores'&&<ProfessoresList onOpenProf={setSelectedProf}/>}
-          {view==='servidores'&&<ServidoresList onOpenServidor={sv=>setSelectedServidor(sv)}/>}
+          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidorId}/>}
           {view==='efe'&&<EfeModule onOpenProf={setSelectedProf}/>}
           {view==='relatorios'&&<div className="flex items-center justify-center h-64 text-slate-400"><div className="text-center"><FileText size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Relatórios · em breve</p></div></div>}
         </main>
       </div>
 
-      {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenProf={p=>{setSelectedProf(p)}} onOpenServidor={sv=>setSelectedServidor(sv)}/>}
+      {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenProf={p=>{setSelectedProf(p)}}/>}
       {selectedProf&&<ProfessorModal prof={selectedProf} onClose={()=>setSelectedProf(null)}/>}
-      {selectedServidor&&<ServidorModal servidorId={selectedServidor.id} nomePreview={selectedServidor.nome} onClose={()=>setSelectedServidor(null)}/>}
+      {selectedServidorId&&<ServidorModal servidorId={selectedServidorId} onClose={()=>setSelectedServidorId(null)}/>}
     </div>
   )
 }
