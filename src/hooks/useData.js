@@ -73,7 +73,6 @@ export function useProfessoresByEscola(escolaId) {
         const map = new Map()
         ;(data ?? []).forEach(n => {
           const p = n.professor
-          if (!p?.id) return
           if (!map.has(p.id)) map.set(p.id, { ...p, nomeacoesAqui: [] })
           map.get(p.id).nomeacoesAqui.push({
             id: n.id, matricula: n.matricula, cargo: n.cargo,
@@ -91,7 +90,7 @@ export function useProfessoresByEscola(escolaId) {
 // ─── EFETIVIDADE ─────────────────────────────────────────────────────────────
 
 export function useEfetividade(escolaId, mesAno) {
-  const [efe, setEfe]       = useState({})   // { professor_id: { status, ocorrencia } }
+  const [efe, setEfe]     = useState({})   // { professor_id: { status, ocorrencia } }
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -160,102 +159,56 @@ export function useDashboardStats() {
   return { stats, loading }
 }
 
-// ─── SERVIDORES (cadastro único + matrículas + vínculos) ─────────────────────
-// Requer as tabelas: servidores, servidor_matriculas, servidor_vinculos
+// ─── BUSCA GLOBAL ─────────────────────────────────────────────────────────────
 
-export function useServidores({ query = '', limit = 500 } = {}) {
-  const [servidores, setServidores] = useState([])
+
+// ─── DETALHES DO PROFESSOR ───────────────────────────────────────────────────
+export function useProfessorDetalhes(profId) {
+  const [prof, setProf] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    // Busca leve: pega somente a base do servidor (sem expandir tudo) para não pesar.
-    // Se você quiser exibir a escola/atuação na lista, pode trocar o select por um join em servidor_vinculos.
-    let q = supabase
-      .from('servidores')
-      .select('id, nome')
-      .order('nome')
-      .limit(limit)
-
-    if (query && query.trim().length >= 2) {
-      q = q.ilike('nome', `%${query.trim()}%`)
-    }
-
-    const { data, error } = await q
-    if (error) {
-      setError(error)
-      setServidores([])
+    if (!profId) {
+      setProf(null)
       setLoading(false)
+      setError(null)
       return
     }
 
-    setServidores(data ?? [])
-    setLoading(false)
-  }, [query, limit])
-
-  useEffect(() => { load() }, [load])
-
-  return { servidores, loading, error, reload: load }
-}
-
-export function useServidorDetalhes(servidorId) {
-  const [servidor, setServidor] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  const load = useCallback(async () => {
-    if (!servidorId) return
     setLoading(true)
     setError(null)
 
     const { data, error } = await supabase
-      .from('servidores')
+      .from('professores')
       .select(`
-        *,
-        servidor_matriculas ( * ),
-        servidor_vinculos ( * )
+        id, nome, status, email, telefone, formacao,
+        regencia_h, htp_h, hti_h,
+        nomeacoes (
+          id, matricula, cargo, tipo_vinculo, observacoes, ativa,
+          escola:escolas ( id, name, tipo )
+        )
       `)
-      .eq('id', servidorId)
+      .eq('id', profId)
       .single()
 
     if (error) {
       setError(error)
-      setServidor(null)
-      setLoading(false)
-      return
+      setProf(null)
+    } else {
+      setProf(data ?? null)
     }
-
-    // ordenações úteis
-    const mats = (data?.servidor_matriculas ?? []).slice().sort((a, b) => {
-      const da = a.data_inicio || ''
-      const db = b.data_inicio || ''
-      return String(db).localeCompare(String(da))
-    })
-
-    const vincs = (data?.servidor_vinculos ?? []).slice().sort((a, b) => {
-      const ea = a.escola?.name || ''
-      const eb = b.escola?.name || ''
-      return ea.localeCompare(eb, 'pt-BR')
-    })
-
-    setServidor({ ...data, servidor_matriculas: mats, servidor_vinculos: vincs })
     setLoading(false)
-  }, [servidorId])
+  }, [profId])
 
   useEffect(() => { load() }, [load])
 
-  return { servidor, loading, error, reload: load }
+  return { prof, loading, error, reload: load }
 }
-
-// ─── BUSCA GLOBAL ─────────────────────────────────────────────────────────────
-
 export async function buscarGlobal(query) {
-  if (!query || query.length < 2) return { profs: [], escolas: [], servidores: [] }
+  if (!query || query.length < 2) return { profs: [], escolas: [] }
 
-  const [{ data: profs }, { data: escolas }, { data: servidores }] = await Promise.all([
+  const [{ data: profs }, { data: escolas }] = await Promise.all([
     supabase
       .from('professores')
       .select('id, nome, status, nomeacoes(escola:escolas(id, name))')
@@ -266,12 +219,7 @@ export async function buscarGlobal(query) {
       .select('*')
       .ilike('name', `%${query}%`)
       .limit(5),
-    supabase
-      .from('servidores')
-      .select('id, nome')
-      .ilike('nome', `%${query}%`)
-      .limit(8),
   ])
 
-  return { profs: profs ?? [], escolas: escolas ?? [], servidores: servidores ?? [] }
+  return { profs: profs ?? [], escolas: escolas ?? [] }
 }

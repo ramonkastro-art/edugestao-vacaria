@@ -3,15 +3,12 @@ import {
   Search, School, Users, Home, FileText, LogOut,
   CheckCircle2, AlertCircle, ArrowRightLeft, X,
   Menu, ChevronRight, GraduationCap, Briefcase,
-  Loader2, RefreshCw, Shield, UserCog, Phone, MapPin, Calendar, Hash
+  Loader2, RefreshCw, Shield
 } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
-import {
-  useEscolas, useProfessores, useProfessoresByEscola,
-  useEfetividade, useDashboardStats, buscarGlobal,
-  useServidores, useServidorDetalhes
-} from './hooks/useData'
+import {useEscolas, useProfessores, useProfessoresByEscola,
+  useEfetividade, useDashboardStats, buscarGlobal, useProfessorDetalhes} from './hooks/useData'
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -21,15 +18,6 @@ const TIPO_COLORS = {
   'EMEF Campo': 'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 const OCORRENCIAS = ['Falta','Licença Médica','Licença Maternidade','Licença Prêmio','Substituição','Afastamento']
-
-// Atuações que são docentes — serão EXCLUÍDAS da aba Servidores
-const ATUACOES_DOCENTES = ['prof','dire','coord','vice','orient','superv','pedagog','docent']
-
-function ehDocente(atuacao) {
-  if (!atuacao) return false
-  const a = atuacao.toLowerCase()
-  return ATUACOES_DOCENTES.some(k => a.includes(k))
-}
 
 function mesAnoAtual() {
   const n = new Date()
@@ -68,245 +56,102 @@ function RoleBadge({ role }) {
 
 function ProfessorModal({ prof, onClose }) {
   if (!prof) return null
-  const nomeacoes = prof.nomeacoes ?? []
+
+  // prefer to load the full profile by id
+  const profId = prof?.id
+  const { prof: fullProf, loading, error, reload } = useProfessorDetalhes(profId)
+
+  const p = fullProf ?? prof
+  const nomeacoes = p?.nomeacoes ?? []
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e=>e.stopPropagation()}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="relative bg-slate-950 p-6">
           <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
             <X size={16} className="text-white"/>
           </button>
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">{initials(prof.nome)}</div>
-            <div>
-              <h2 className="text-lg font-semibold text-white leading-snug">{prof.nome}</h2>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${prof.status==='Ativo'?'bg-emerald-500/20 text-emerald-300':'bg-amber-500/20 text-amber-300'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${prof.status==='Ativo'?'bg-emerald-400':'bg-amber-400'}`}/>
-                  {prof.status}
-                </span>
-                {nomeacoes.length>1&&<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300"><Briefcase size={10}/>{nomeacoes.length} nomeações</span>}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Unidades / Nomeações</p>
-            <div className="space-y-2">
-              {nomeacoes.length===0&&<p className="text-sm text-slate-400 italic">Nenhuma nomeação registrada</p>}
-              {nomeacoes.map((n,i)=>{
-                const escola=n.escola??{}
-                return (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
-                    <School size={15} className="text-slate-400 mt-0.5 shrink-0"/>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 leading-snug">{escola.name??'—'}</p>
-                      {n.matricula&&<p className="text-xs font-mono text-slate-400 mt-0.5">{n.matricula}</p>}
-                      {n.cargo&&<p className="text-xs text-slate-500">{n.cargo}</p>}
-                      {n.observacoes&&<p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1"><AlertCircle size={11}/>{n.observacoes}</p>}
-                    </div>
-                    {escola.tipo&&<Badge className={TIPO_COLORS[escola.tipo]}>{escola.tipo}</Badge>}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          {(prof.regencia_h||prof.htp_h||prof.hti_h)?(
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Carga Horária</p>
-              <div className="grid grid-cols-3 gap-2">
-                {[['Regência',prof.regencia_h],['HTP',prof.htp_h],['HTI',prof.hti_h]].map(([l,v])=>(
-                  <div key={l} className="bg-slate-50 rounded-2xl p-3 text-center">
-                    <p className="text-xl font-semibold text-slate-700">{v??'—'}h</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{l}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ):null}
-          {prof.formacao&&(
-            <div className="flex items-start gap-3 p-3 bg-violet-50 rounded-2xl">
-              <GraduationCap size={16} className="text-violet-500 mt-0.5 shrink-0"/>
-              <div>
-                <p className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Formação</p>
-                <p className="text-sm text-slate-700 mt-0.5">{prof.formacao}</p>
-              </div>
-            </div>
-          )}
-          <div className="flex gap-2 pt-1">
-            <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"><ArrowRightLeft size={14}/> Transferir</button>
-            <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"><FileText size={14}/> Histórico</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
-// ─── SERVIDOR MODAL ──────────────────────────────────────────────────────────
-
-function ServidorModal({ servidorId, onClose }) {
-  const { servidor, loading, error } = useServidorDetalhes(servidorId)
-
-  if (!servidorId) return null
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e=>e.stopPropagation()}>
-        {/* Header */}
-        <div className="relative bg-slate-950 p-6">
-          <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-            <X size={16} className="text-white"/>
-          </button>
           {loading ? (
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center"><Loader2 size={20} className="animate-spin text-white/50"/></div>
-              <p className="text-white/50 text-sm">Carregando…</p>
-            </div>
+            <div className="flex items-center justify-center py-8"><Spinner/></div>
           ) : error ? (
-            <p className="text-red-300 text-sm">Erro ao carregar dados.</p>
-          ) : servidor ? (
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">{initials(servidor.nome)}</div>
-              <div>
-                <h2 className="text-lg font-semibold text-white leading-snug">{servidor.nome}</h2>
-                <p className="text-white/50 text-xs mt-1">Servidor Municipal</p>
-              </div>
+            <div className="p-6">
+              <p className="text-sm text-red-500">Erro ao carregar dados.</p>
+              <button onClick={reload} className="mt-3 px-3 py-2 bg-slate-100 rounded">Tentar novamente</button>
             </div>
-          ) : null}
-        </div>
-
-        {/* Body */}
-        {!loading && !error && servidor && (
-          <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
-
-            {/* Dados pessoais */}
-            <div className="space-y-2">
-              {servidor.data_nascimento && (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
-                  <Calendar size={15} className="text-slate-400 shrink-0"/>
-                  <div>
-                    <p className="text-xs text-slate-400">Nascimento</p>
-                    <p className="text-sm font-medium text-slate-700">{new Date(servidor.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">{initials(p.nome)}</div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white leading-snug">{p.nome}</h2>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${p.status==='Ativo'?'bg-emerald-500/20 text-emerald-300':'bg-amber-500/20 text-amber-300'}`}>
+                      {p.status ?? '—'}
+                    </span>
+                    {p.formacao && <span className="text-xs text-slate-300">{p.formacao}</span>}
                   </div>
-                </div>
-              )}
-              {servidor.telefone && (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
-                  <Phone size={15} className="text-slate-400 shrink-0"/>
-                  <div>
-                    <p className="text-xs text-slate-400">Telefone</p>
-                    <p className="text-sm font-medium text-slate-700">{servidor.telefone}</p>
-                  </div>
-                </div>
-              )}
-              {servidor.endereco && (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
-                  <MapPin size={15} className="text-slate-400 shrink-0"/>
-                  <div>
-                    <p className="text-xs text-slate-400">Endereço</p>
-                    <p className="text-sm font-medium text-slate-700">{servidor.endereco}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Matrículas */}
-            {(servidor.servidor_matriculas ?? []).length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Matrículas</p>
-                <div className="space-y-2">
-                  {(servidor.servidor_matriculas ?? []).map((m, i) => (
-                    <div key={m.id ?? i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
-                      <Hash size={14} className="text-slate-400 mt-0.5 shrink-0"/>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-mono text-slate-600 break-all">{m.matricula_raw || m.matricula_norm || '—'}</p>
-                        {m.data_inicio && (
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Início: {new Date(m.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
-            )}
 
-            {/* Vínculos / Atuações */}
-            {(servidor.servidor_vinculos ?? []).length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Atuação / Escola</p>
-                <div className="space-y-2">
-                  {(servidor.servidor_vinculos ?? []).map((v, i) => {
-                    const escola = v.escola ?? {}
-                    // pula linhas de cabeçalho importadas por engano
-                    if (!v.atuacao || v.atuacao.toUpperCase() === 'ATUAÇÃO') return null
-                    return (
-                      <div key={v.id ?? i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
-                        <School size={15} className="text-slate-400 mt-0.5 shrink-0"/>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800 leading-snug">{escola.name || v.escola || '—'}</p>
-                          {v.atuacao && <p className="text-xs text-slate-500 mt-0.5">{v.atuacao}</p>}
-                          {v.vinculo_empregaticio && !/e-?mail/i.test(v.vinculo_empregaticio) && (
-                            <p className="text-xs text-slate-400">{v.vinculo_empregaticio}</p>
-                          )}
-                          {v.turno && !/turno/i.test(v.turno) && (
-                            <p className="text-xs text-slate-400">Turno: {v.turno}</p>
-                          )}
-                          {v.formacao && (
-                            <p className="text-xs text-violet-600 mt-0.5 flex items-center gap-1"><GraduationCap size={11}/>{v.formacao}</p>
-                          )}
+              <div className="p-6 border-t border-slate-800">
+                <p className="text-xs text-slate-400">Contact</p>
+                <div className="mt-2 text-sm text-slate-200">
+                  <div>{p.email ?? '—'}</div>
+                  <div>{p.telefone ?? '—'}</div>
+                  <div>{p.data_nascimento ? `Nasc.: ${p.data_nascimento}` : null}</div>
+                </div>
+
+                {(nomeacoes.length > 0) && (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Nomeações</p>
+                    <div className="space-y-2">
+                      {nomeacoes.map(n => (
+                        <div key={n.id} className="p-3 bg-slate-50 rounded">
+                          <div className="text-sm font-medium">{n.cargo ?? '—'}</div>
+                          <div className="text-xs text-slate-500">{n.matricula ?? ''} — {n.escola?.name ?? n.escola}</div>
+                          {n.observacoes && <div className="text-xs mt-1 text-slate-600">{n.observacoes}</div>}
                         </div>
-                        {escola.tipo && <Badge className={TIPO_COLORS[escola.tipo] || 'bg-slate-50 text-slate-600 border-slate-200'}>{escola.tipo}</Badge>}
-                      </div>
-                    )
-                  })}
-                </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Sem dados */}
-            {(servidor.servidor_vinculos ?? []).length === 0 && (servidor.servidor_matriculas ?? []).length === 0 && (
-              <p className="text-sm text-slate-400 italic text-center py-4">Nenhum vínculo ou matrícula registrado.</p>
-            )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
 }
-
-// ─── SEARCH OVERLAY ──────────────────────────────────────────────────────────
 
 function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
   const [query,setQuery]=useState('')
-  const [results,setResults]=useState({profs:[],escolas:[],servidores:[]})
+  const [results,setResults]=useState({profs:[],escolas:[]})
   const [searching,setSearching]=useState(false)
   useEffect(()=>{const h=e=>{if(e.key==='Escape')onClose()};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h)},[onClose])
   useEffect(()=>{
-    if(query.length<2){setResults({profs:[],escolas:[],servidores:[]});return}
+    if(query.length<2){setResults({profs:[],escolas:[]});return}
     setSearching(true)
     const t=setTimeout(async()=>{const r=await buscarGlobal(query);setResults(r);setSearching(false)},250)
     return()=>clearTimeout(t)
   },[query])
-  const hasResults=(results.profs??[]).length>0||(results.escolas??[]).length>0||(results.servidores??[]).length>0
+  const hasResults=results.profs.length>0||results.escolas.length>0
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/30 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center gap-3 p-4 border-b border-slate-100">
           {searching?<Loader2 size={16} className="animate-spin text-slate-400 shrink-0"/>:<Search size={16} className="text-slate-400 shrink-0"/>}
-          <input autoFocus className="flex-1 text-base outline-none placeholder:text-slate-300 bg-transparent" placeholder="Buscar professor, servidor ou escola..." value={query} onChange={e=>setQuery(e.target.value)}/>
+          <input autoFocus className="flex-1 text-base outline-none placeholder:text-slate-300 bg-transparent" placeholder="Buscar professor ou escola..." value={query} onChange={e=>setQuery(e.target.value)}/>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition-colors"><X size={16} className="text-slate-400"/></button>
         </div>
         <div className="max-h-96 overflow-y-auto">
           {query.length>=2&&!searching&&!hasResults&&<p className="text-center py-10 text-sm text-slate-400">Nenhum resultado para "{query}"</p>}
           {query.length<2&&<p className="text-center py-10 text-sm text-slate-400">Digite ao menos 2 letras para buscar</p>}
-          {(results.escolas??[]).length>0&&(
+          {results.escolas.length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Escolas</p>
-              {(results.escolas??[]).map(s=>(
+              {results.escolas.map(s=>(
                 <button key={s.id} onClick={()=>{onSelectSchool(s);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
                   <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center"><School size={14} className="text-slate-500"/></div>
                   <div><p className="text-sm font-medium text-slate-700">{s.name}</p><p className="text-xs text-slate-400">{s.tipo}</p></div>
@@ -314,10 +159,10 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
               ))}
             </div>
           )}
-          {(results.profs??[]).length>0&&(
+          {results.profs.length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Professores</p>
-              {(results.profs??[]).map(p=>{
+              {results.profs.map(p=>{
                 const esc=(p.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean)
                 return (
                   <button key={p.id} onClick={()=>{onOpenProf(p);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
@@ -327,17 +172,6 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
                   </button>
                 )
               })}
-            </div>
-          )}
-          {(results.servidores??[]).length>0&&(
-            <div className="p-2">
-              <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Servidores</p>
-              {(results.servidores??[]).map(s=>(
-                <button key={s.id} onClick={()=>{onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
-                  <AvatarCircle name={s.nome} size="sm"/>
-                  <div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-700">{s.nome}</p></div>
-                </button>
-              ))}
             </div>
           )}
         </div>
@@ -485,7 +319,7 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>onOpenProf(prof)}>
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-slate-800">{prof.nome}</p>
-                    {(prof.nomeacoesAqui??[]).length>1&&<Badge className="bg-violet-50 text-violet-600 border-violet-200">{prof.nomeacoesAqui.length}× nomeações</Badge>}
+                    {prof.nomeacoesAqui?.length>1&&<Badge className="bg-violet-50 text-violet-600 border-violet-200">{prof.nomeacoesAqui.length}× nomeações</Badge>}
                     {outra&&<Badge className="bg-blue-50 text-blue-600 border-blue-200"><Briefcase size={10}/> 2ª escola</Badge>}
                   </div>
                   {outra&&<p className="text-xs text-slate-400 mt-0.5 truncate">Também em: {outra.escola?.name}</p>}
@@ -564,80 +398,6 @@ function ProfessoresList({ onOpenProf }) {
   )
 }
 
-// ─── SERVIDORES LIST ─────────────────────────────────────────────────────────
-
-function ServidoresList({ onOpenServidor }) {
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  // debounce para não disparar query a cada tecla
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(t)
-  }, [search])
-
-  const { servidores, loading, reload } = useServidores({ query: debouncedSearch, limit: 500 })
-
-  // Filtra: só mostra quem tem pelo menos 1 vínculo que NÃO seja docente
-  // Como useServidores retorna só id+nome (sem vinculos), usamos a lista completa
-  // e deixamos o filtro de docente para o modal. Aqui mostramos todos os servidores
-  // (a separação professor/servidor é feita pela origem dos dados: professores vêm
-  // da tabela `professores`, servidores vêm da tabela `servidores`).
-
-  if (loading) return <Spinner/>
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Servidores</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Administrativo · Merendeiras · Serventes · e outros</p>
-        </div>
-        <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" title="Recarregar">
-          <RefreshCw size={16} className="text-slate-500"/>
-        </button>
-      </div>
-
-      <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2">
-        <Search size={15} className="text-slate-400"/>
-        <input
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-          placeholder="Buscar servidor..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        {search && <button onClick={() => setSearch('')}><X size={14} className="text-slate-400"/></button>}
-      </div>
-
-      <p className="text-xs text-slate-400">{servidores.length} servidor{servidores.length !== 1 ? 'es' : ''} encontrado{servidores.length !== 1 ? 's' : ''}</p>
-
-      {servidores.length === 0 && !loading && (
-        <div className="text-center py-16 text-slate-400">
-          <UserCog size={32} className="mx-auto mb-2 opacity-30"/>
-          <p className="text-sm">Nenhum servidor encontrado</p>
-          <p className="text-xs mt-1 text-slate-300">Verifique se os dados foram importados no Supabase</p>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {servidores.map(s => (
-          <div
-            key={s.id}
-            onClick={() => onOpenServidor(s.id)}
-            className="group flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all"
-          >
-            <AvatarCircle name={s.nome}/>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800">{s.nome}</p>
-            </div>
-            <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0"/>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ─── EFE MODULE ──────────────────────────────────────────────────────────────
 
 function EfeModule({ onOpenProf }) {
@@ -702,7 +462,6 @@ export default function App() {
   const [view,setView]=useState('dashboard')
   const [selectedSchool,setSelectedSchool]=useState(null)
   const [selectedProf,setSelectedProf]=useState(null)
-  const [selectedServidorId,setSelectedServidorId]=useState(null)
   const [searchOpen,setSearchOpen]=useState(false)
   const [sidebarOpen,setSidebarOpen]=useState(true)
 
@@ -722,7 +481,6 @@ export default function App() {
     {id:'dashboard',label:'Dashboard',icon:Home},
     {id:'schools',label:'Unidades',icon:School},
     {id:'professores',label:'Professores',icon:Users},
-    {id:'servidores',label:'Servidores',icon:UserCog},
     {id:'efe',label:'Efetividade',icon:CheckCircle2},
     {id:'relatorios',label:'Relatórios',icon:FileText},
   ]
@@ -761,7 +519,7 @@ export default function App() {
         <header className="h-14 bg-white border-b border-slate-100 flex items-center gap-3 px-4 shrink-0 sticky top-0 z-20">
           <button onClick={()=>setSidebarOpen(!sidebarOpen)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><Menu size={17} className="text-slate-500"/></button>
           <button onClick={()=>setSearchOpen(true)} className="flex-1 max-w-sm flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-400 hover:bg-slate-200 transition-colors">
-            <Search size={14}/><span className="flex-1 text-left">Buscar professor, servidor ou escola...</span>
+            <Search size={14}/><span className="flex-1 text-left">Buscar professor ou escola...</span>
             <kbd className="text-xs bg-white border border-slate-200 px-1.5 py-0.5 rounded-md font-mono">⌘K</kbd>
           </button>
           <div className="ml-auto">
@@ -775,7 +533,6 @@ export default function App() {
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenProf={setSelectedProf}/>}
           {view==='professores'&&<ProfessoresList onOpenProf={setSelectedProf}/>}
-          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidorId}/>}
           {view==='efe'&&<EfeModule onOpenProf={setSelectedProf}/>}
           {view==='relatorios'&&<div className="flex items-center justify-center h-64 text-slate-400"><div className="text-center"><FileText size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Relatórios · em breve</p></div></div>}
         </main>
@@ -783,7 +540,6 @@ export default function App() {
 
       {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenProf={p=>{setSelectedProf(p)}}/>}
       {selectedProf&&<ProfessorModal prof={selectedProf} onClose={()=>setSelectedProf(null)}/>}
-      {selectedServidorId&&<ServidorModal servidorId={selectedServidorId} onClose={()=>setSelectedServidorId(null)}/>}
     </div>
   )
 }
