@@ -1,16 +1,18 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Search, School, Users, Home, FileText, LogOut,
   CheckCircle2, AlertCircle, ArrowRightLeft, X,
   Menu, ChevronRight, GraduationCap, Briefcase,
-  Loader2, RefreshCw, Shield, UserCog, Phone, MapPin, Calendar, Hash
+  Loader2, RefreshCw, Shield, Plus, Edit2, Save,
+  ChevronDown, UserPlus, Trash2
 } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import {
   useEscolas, useProfessores, useProfessoresByEscola,
-  useEfetividade, useDashboardStats, buscarGlobal,
-  useServidores, useServidorDetalhes
+  useServidores, useEfetividade, useDashboardStats, buscarGlobal,
+  criarProfessor, atualizarProfessor, adicionarNomeacao, removerNomeacao,
+  criarServidor, atualizarServidor
 } from './hooks/useData'
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -21,15 +23,8 @@ const TIPO_COLORS = {
   'EMEF Campo': 'bg-emerald-50 text-emerald-700 border-emerald-200',
 }
 const OCORRENCIAS = ['Falta','Licença Médica','Licença Maternidade','Licença Prêmio','Substituição','Afastamento']
-
-// Atuações que são docentes — serão EXCLUÍDAS da aba Servidores
-const ATUACOES_DOCENTES = ['prof','dire','coord','vice','orient','superv','pedagog','docent']
-
-function ehDocente(atuacao) {
-  if (!atuacao) return false
-  const a = atuacao.toLowerCase()
-  return ATUACOES_DOCENTES.some(k => a.includes(k))
-}
+const CARGOS_SERVIDOR = ['Merendeira','Servente','Secretário(a)','Auxiliar Administrativo','Vigia','Porteiro(a)','Zelador(a)','Assistente de Educação','Auxiliar de Serviços Gerais','Outro']
+const VINCULOS = ['Efetivo','Designação','Contratado']
 
 function mesAnoAtual() {
   const n = new Date()
@@ -63,38 +58,332 @@ function RoleBadge({ role }) {
   const {l,c}=map[role]||map.professor
   return <Badge className={c}><Shield size={10}/>{l}</Badge>
 }
+function FieldLabel({ children }) {
+  return <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">{children}</label>
+}
+function Input({ className='', ...props }) {
+  return <input className={`w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-slate-400 transition-colors placeholder:text-slate-300 ${className}`} {...props}/>
+}
+function Select({ className='', children, ...props }) {
+  return <select className={`w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-slate-400 transition-colors ${className}`} {...props}>{children}</select>
+}
+function isAdmin(profile) {
+  return profile?.role === 'secretaria' || profile?.role === 'rh'
+}
 
-// ─── PROFESSOR MODAL ─────────────────────────────────────────────────────────
+// ─── FORMULÁRIO PROFESSOR ────────────────────────────────────────────────────
 
-function ProfessorModal({ prof, onClose }) {
+function FormProfessor({ prof, escolas, onClose, onSaved }) {
+  const editando = !!prof
+  const [form, setForm] = useState({
+    nome: prof?.nome ?? '',
+    email: prof?.email ?? '',
+    telefone: prof?.telefone ?? '',
+    formacao: prof?.formacao ?? '',
+    regencia_h: prof?.regencia_h ?? '',
+    htp_h: prof?.htp_h ?? '',
+    hti_h: prof?.hti_h ?? '',
+    status: prof?.status ?? 'Ativo',
+  })
+  const [nomeacoes, setNomeacoes] = useState(
+    prof?.nomeacoes?.map(n => ({ id: n.id, escola_id: n.escola?.id ?? '', matricula: n.matricula ?? '', cargo: n.cargo ?? '', tipo_vinculo: n.tipo_vinculo ?? 'Efetivo', _novo: false })) ?? []
+  )
+  const [novaEscola, setNovaEscola] = useState({ escola_id: '', matricula: '', cargo: '', tipo_vinculo: 'Efetivo' })
+  const [saving, setSaving] = useState(false)
+  const [erro, setErro] = useState('')
+
+  function set(field, val) { setForm(prev => ({ ...prev, [field]: val })) }
+
+  async function handleSave() {
+    if (!form.nome.trim()) { setErro('Nome é obrigatório.'); return }
+    setSaving(true); setErro('')
+    try {
+      if (editando) {
+        const { error } = await atualizarProfessor(prof.id, form)
+        if (error) throw error
+      } else {
+        const { data, error } = await criarProfessor({
+          ...form,
+          regencia_h: form.regencia_h ? parseInt(form.regencia_h) : null,
+          htp_h: form.htp_h ? parseInt(form.htp_h) : null,
+          hti_h: form.hti_h ? parseInt(form.hti_h) : null,
+          nomeacoes: nomeacoes.filter(n => n.escola_id).map(n => ({
+            escola_id: parseInt(n.escola_id), matricula: n.matricula, cargo: n.cargo, tipo_vinculo: n.tipo_vinculo
+          }))
+        })
+        if (error) throw error
+      }
+      onSaved()
+      onClose()
+    } catch(e) { setErro(e.message ?? 'Erro ao salvar.') }
+    setSaving(false)
+  }
+
+  async function handleAddNomeacao() {
+    if (!novaEscola.escola_id) return
+    if (editando && prof.id) {
+      await adicionarNomeacao(prof.id, { escola_id: parseInt(novaEscola.escola_id), matricula: novaEscola.matricula, cargo: novaEscola.cargo, tipo_vinculo: novaEscola.tipo_vinculo })
+      onSaved()
+    } else {
+      setNomeacoes(prev => [...prev, { ...novaEscola, _novo: true }])
+    }
+    setNovaEscola({ escola_id: '', matricula: '', cargo: '', tipo_vinculo: 'Efetivo' })
+  }
+
+  async function handleRemoveNomeacao(n, idx) {
+    if (n.id && !n._novo) {
+      await removerNomeacao(n.id)
+      onSaved()
+    }
+    setNomeacoes(prev => prev.filter((_,i) => i !== idx))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+        <div className="bg-slate-950 px-6 py-5 flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-white">{editando ? 'Editar Professor' : 'Novo Professor'}</h2>
+            <p className="text-xs text-slate-400 mt-0.5">{editando ? prof.nome : 'Preencha os dados do professor'}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"><X size={16} className="text-white"/></button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-6 space-y-5">
+          {/* Dados pessoais */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Dados pessoais</p>
+            <div className="space-y-3">
+              <div>
+                <FieldLabel>Nome completo *</FieldLabel>
+                <Input value={form.nome} onChange={e=>set('nome',e.target.value)} placeholder="Nome do professor"/>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <FieldLabel>E-mail</FieldLabel>
+                  <Input type="email" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="email@vacaria.rs.gov.br"/>
+                </div>
+                <div>
+                  <FieldLabel>Telefone</FieldLabel>
+                  <Input value={form.telefone} onChange={e=>set('telefone',e.target.value)} placeholder="(54) 9 9999-9999"/>
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Formação</FieldLabel>
+                <Input value={form.formacao} onChange={e=>set('formacao',e.target.value)} placeholder="Ex.: Pedagogia + Especialização"/>
+              </div>
+              <div>
+                <FieldLabel>Status</FieldLabel>
+                <Select value={form.status} onChange={e=>set('status',e.target.value)}>
+                  <option>Ativo</option><option>Afastado</option>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Carga horária */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Carga horária semanal</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[['Regência','regencia_h'],['HTP','htp_h'],['HTI','hti_h']].map(([l,k])=>(
+                <div key={k}>
+                  <FieldLabel>{l} (h)</FieldLabel>
+                  <Input type="number" min="0" max="40" value={form[k]} onChange={e=>set(k,e.target.value)} placeholder="0"/>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Nomeações */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Nomeações / Escolas</p>
+            <div className="space-y-2 mb-3">
+              {nomeacoes.map((n,i)=>{
+                const escola = escolas.find(e=>e.id===parseInt(n.escola_id))
+                return (
+                  <div key={i} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl">
+                    <School size={14} className="text-slate-400 shrink-0"/>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-700 truncate">{escola?.name ?? '—'}</p>
+                      {n.matricula&&<p className="text-xs text-slate-400 font-mono">{n.matricula}</p>}
+                    </div>
+                    <Badge className="bg-slate-100 text-slate-600 border-slate-200">{n.tipo_vinculo}</Badge>
+                    <button onClick={()=>handleRemoveNomeacao(n,i)} className="p-1 text-red-400 hover:text-red-600 transition-colors"><Trash2 size={13}/></button>
+                  </div>
+                )
+              })}
+              {nomeacoes.length===0&&<p className="text-xs text-slate-400 italic">Nenhuma nomeação. Adicione abaixo.</p>}
+            </div>
+            {/* Adicionar nomeação */}
+            <div className="border border-dashed border-slate-300 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-medium text-slate-500">Adicionar nomeação</p>
+              <Select value={novaEscola.escola_id} onChange={e=>setNovaEscola(p=>({...p,escola_id:e.target.value}))}>
+                <option value="">Selecionar escola...</option>
+                {escolas.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <Input value={novaEscola.matricula} onChange={e=>setNovaEscola(p=>({...p,matricula:e.target.value}))} placeholder="Matrícula"/>
+                <Input value={novaEscola.cargo} onChange={e=>setNovaEscola(p=>({...p,cargo:e.target.value}))} placeholder="Cargo"/>
+              </div>
+              <div className="flex gap-2">
+                <Select value={novaEscola.tipo_vinculo} onChange={e=>setNovaEscola(p=>({...p,tipo_vinculo:e.target.value}))}>
+                  {VINCULOS.map(v=><option key={v}>{v}</option>)}
+                </Select>
+                <button onClick={handleAddNomeacao} disabled={!novaEscola.escola_id} className="px-3 py-2 bg-slate-900 text-white text-xs font-medium rounded-xl hover:bg-slate-700 transition-colors disabled:opacity-40 shrink-0">
+                  <Plus size={13}/>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {erro&&<div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{erro}</div>}
+        </div>
+
+        <div className="p-5 border-t border-slate-100 flex gap-3 shrink-0">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-950 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60">
+            {saving?<Loader2 size={14} className="animate-spin"/>:<Save size={14}/>}
+            {saving?'Salvando…':'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── FORMULÁRIO SERVIDOR ─────────────────────────────────────────────────────
+
+function FormServidor({ servidor, escolas, onClose, onSaved }) {
+  const editando = !!servidor
+  const [form, setForm] = useState({
+    nome: servidor?.nome ?? '',
+    email: servidor?.email ?? '',
+    telefone: servidor?.telefone ?? '',
+    cargo: servidor?.cargo ?? '',
+    escola_id: servidor?.escola?.id ?? '',
+    status: servidor?.status ?? 'Ativo',
+    observacoes: servidor?.observacoes ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [erro, setErro] = useState('')
+
+  function set(field, val) { setForm(prev => ({ ...prev, [field]: val })) }
+
+  async function handleSave() {
+    if (!form.nome.trim()) { setErro('Nome é obrigatório.'); return }
+    setSaving(true); setErro('')
+    const payload = { ...form, escola_id: form.escola_id ? parseInt(form.escola_id) : null }
+    try {
+      if (editando) {
+        const { error } = await atualizarServidor(servidor.id, payload)
+        if (error) throw error
+      } else {
+        const { error } = await criarServidor(payload)
+        if (error) throw error
+      }
+      onSaved(); onClose()
+    } catch(e) { setErro(e.message ?? 'Erro ao salvar.') }
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e=>e.stopPropagation()}>
+        <div className="bg-slate-950 px-6 py-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-white">{editando ? 'Editar Servidor' : 'Novo Servidor'}</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Pessoal técnico-administrativo</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"><X size={16} className="text-white"/></button>
+        </div>
+
+        <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+          <div>
+            <FieldLabel>Nome completo *</FieldLabel>
+            <Input value={form.nome} onChange={e=>set('nome',e.target.value)} placeholder="Nome do servidor"/>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <FieldLabel>E-mail</FieldLabel>
+              <Input type="email" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="email@"/>
+            </div>
+            <div>
+              <FieldLabel>Telefone</FieldLabel>
+              <Input value={form.telefone} onChange={e=>set('telefone',e.target.value)} placeholder="(54) 9..."/>
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Cargo / Função</FieldLabel>
+            <Select value={form.cargo} onChange={e=>set('cargo',e.target.value)}>
+              <option value="">Selecionar cargo...</option>
+              {CARGOS_SERVIDOR.map(c=><option key={c}>{c}</option>)}
+            </Select>
+          </div>
+          <div>
+            <FieldLabel>Escola</FieldLabel>
+            <Select value={form.escola_id} onChange={e=>set('escola_id',e.target.value)}>
+              <option value="">Sem escola vinculada</option>
+              {escolas.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+            </Select>
+          </div>
+          <div>
+            <FieldLabel>Status</FieldLabel>
+            <Select value={form.status} onChange={e=>set('status',e.target.value)}>
+              <option>Ativo</option><option>Afastado</option>
+            </Select>
+          </div>
+          <div>
+            <FieldLabel>Observações</FieldLabel>
+            <textarea value={form.observacoes} onChange={e=>set('observacoes',e.target.value)} rows={2} placeholder="Opcional..." className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-slate-400 transition-colors resize-none placeholder:text-slate-300"/>
+          </div>
+          {erro&&<div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{erro}</div>}
+        </div>
+
+        <div className="p-5 border-t border-slate-100 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-950 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60">
+            {saving?<Loader2 size={14} className="animate-spin"/>:<Save size={14}/>}
+            {saving?'Salvando…':'Salvar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── PROFESSOR MODAL (visualização) ──────────────────────────────────────────
+
+function ProfessorModal({ prof, onClose, onEdit, isAdmin }) {
   if (!prof) return null
   const nomeacoes = prof.nomeacoes ?? []
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e=>e.stopPropagation()}>
         <div className="relative bg-slate-950 p-6">
-          <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-            <X size={16} className="text-white"/>
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">{initials(prof.nome)}</div>
-            <div>
-              <h2 className="text-lg font-semibold text-white leading-snug">{prof.nome}</h2>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${prof.status==='Ativo'?'bg-emerald-500/20 text-emerald-300':'bg-amber-500/20 text-amber-300'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${prof.status==='Ativo'?'bg-emerald-400':'bg-amber-400'}`}/>
-                  {prof.status}
-                </span>
-                {nomeacoes.length>1&&<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300"><Briefcase size={10}/>{nomeacoes.length} nomeações</span>}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">{initials(prof.nome)}</div>
+              <div>
+                <h2 className="text-lg font-semibold text-white leading-snug">{prof.nome}</h2>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${prof.status==='Ativo'?'bg-emerald-500/20 text-emerald-300':'bg-amber-500/20 text-amber-300'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${prof.status==='Ativo'?'bg-emerald-400':'bg-amber-400'}`}/>{prof.status}
+                  </span>
+                  {nomeacoes.length>1&&<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300"><Briefcase size={10}/>{nomeacoes.length} nomeações</span>}
+                </div>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {isAdmin&&<button onClick={()=>onEdit(prof)} className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors" title="Editar"><Edit2 size={15} className="text-white"/></button>}
+              <button onClick={onClose} className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"><X size={16} className="text-white"/></button>
             </div>
           </div>
         </div>
-        <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+        <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Unidades / Nomeações</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Nomeações / Escolas</p>
             <div className="space-y-2">
-              {nomeacoes.length===0&&<p className="text-sm text-slate-400 italic">Nenhuma nomeação registrada</p>}
+              {nomeacoes.length===0&&<p className="text-sm text-slate-400 italic">Nenhuma nomeação</p>}
               {nomeacoes.map((n,i)=>{
                 const escola=n.escola??{}
                 return (
@@ -112,7 +401,7 @@ function ProfessorModal({ prof, onClose }) {
               })}
             </div>
           </div>
-          {(prof.regencia_h||prof.htp_h||prof.hti_h)?(
+          {(prof.regencia_h||prof.htp_h||prof.hti_h)&&(
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Carga Horária</p>
               <div className="grid grid-cols-3 gap-2">
@@ -124,7 +413,7 @@ function ProfessorModal({ prof, onClose }) {
                 ))}
               </div>
             </div>
-          ):null}
+          )}
           {prof.formacao&&(
             <div className="flex items-start gap-3 p-3 bg-violet-50 rounded-2xl">
               <GraduationCap size={16} className="text-violet-500 mt-0.5 shrink-0"/>
@@ -134,145 +423,66 @@ function ProfessorModal({ prof, onClose }) {
               </div>
             </div>
           )}
-          <div className="flex gap-2 pt-1">
-            <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"><ArrowRightLeft size={14}/> Transferir</button>
-            <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"><FileText size={14}/> Histórico</button>
-          </div>
+          {(prof.email||prof.telefone)&&(
+            <div className="p-3 bg-slate-50 rounded-2xl space-y-1">
+              {prof.email&&<p className="text-sm text-slate-600 flex items-center gap-2"><span className="text-slate-400 w-16 text-xs">Email</span>{prof.email}</p>}
+              {prof.telefone&&<p className="text-sm text-slate-600 flex items-center gap-2"><span className="text-slate-400 w-16 text-xs">Telefone</span>{prof.telefone}</p>}
+            </div>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-// ─── SERVIDOR MODAL ──────────────────────────────────────────────────────────
+// ─── SERVIDOR MODAL (visualização) ───────────────────────────────────────────
 
-function ServidorModal({ servidorId, onClose }) {
-  const { servidor, loading, error } = useServidorDetalhes(servidorId)
-
-  if (!servidorId) return null
-
+function ServidorModal({ servidor, onClose, onEdit, isAdmin }) {
+  if (!servidor) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e=>e.stopPropagation()}>
-        {/* Header */}
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e=>e.stopPropagation()}>
         <div className="relative bg-slate-950 p-6">
-          <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-            <X size={16} className="text-white"/>
-          </button>
-          {loading ? (
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center"><Loader2 size={20} className="animate-spin text-white/50"/></div>
-              <p className="text-white/50 text-sm">Carregando…</p>
-            </div>
-          ) : error ? (
-            <p className="text-red-300 text-sm">Erro ao carregar dados.</p>
-          ) : servidor ? (
+          <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">{initials(servidor.nome)}</div>
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-base font-semibold text-white">{initials(servidor.nome)}</div>
               <div>
-                <h2 className="text-lg font-semibold text-white leading-snug">{servidor.nome}</h2>
-                <p className="text-white/50 text-xs mt-1">Servidor Municipal</p>
+                <h2 className="text-base font-semibold text-white">{servidor.nome}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">{servidor.cargo ?? 'Cargo não informado'}</p>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${servidor.status==='Ativo'?'bg-emerald-500/20 text-emerald-300':'bg-amber-500/20 text-amber-300'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${servidor.status==='Ativo'?'bg-emerald-400':'bg-amber-400'}`}/>{servidor.status}
+                </span>
               </div>
             </div>
-          ) : null}
-        </div>
-
-        {/* Body */}
-        {!loading && !error && servidor && (
-          <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
-
-            {/* Dados pessoais */}
-            <div className="space-y-2">
-              {servidor.data_nascimento && (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
-                  <Calendar size={15} className="text-slate-400 shrink-0"/>
-                  <div>
-                    <p className="text-xs text-slate-400">Nascimento</p>
-                    <p className="text-sm font-medium text-slate-700">{new Date(servidor.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
-                  </div>
-                </div>
-              )}
-              {servidor.telefone && (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
-                  <Phone size={15} className="text-slate-400 shrink-0"/>
-                  <div>
-                    <p className="text-xs text-slate-400">Telefone</p>
-                    <p className="text-sm font-medium text-slate-700">{servidor.telefone}</p>
-                  </div>
-                </div>
-              )}
-              {servidor.endereco && (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
-                  <MapPin size={15} className="text-slate-400 shrink-0"/>
-                  <div>
-                    <p className="text-xs text-slate-400">Endereço</p>
-                    <p className="text-sm font-medium text-slate-700">{servidor.endereco}</p>
-                  </div>
-                </div>
-              )}
+            <div className="flex gap-2">
+              {isAdmin&&<button onClick={()=>onEdit(servidor)} className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"><Edit2 size={15} className="text-white"/></button>}
+              <button onClick={onClose} className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"><X size={16} className="text-white"/></button>
             </div>
-
-            {/* Matrículas */}
-            {(servidor.servidor_matriculas ?? []).length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Matrículas</p>
-                <div className="space-y-2">
-                  {(servidor.servidor_matriculas ?? []).map((m, i) => (
-                    <div key={m.id ?? i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
-                      <Hash size={14} className="text-slate-400 mt-0.5 shrink-0"/>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-mono text-slate-600 break-all">{m.matricula_raw || m.matricula_norm || '—'}</p>
-                        {m.data_inicio && (
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Início: {new Date(m.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Vínculos / Atuações */}
-            {(servidor.servidor_vinculos ?? []).length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Atuação / Escola</p>
-                <div className="space-y-2">
-                  {(servidor.servidor_vinculos ?? []).map((v, i) => {
-                    const escola = v.escola ?? {}
-                    // pula linhas de cabeçalho importadas por engano
-                    if (!v.atuacao || v.atuacao.toUpperCase() === 'ATUAÇÃO') return null
-                    return (
-                      <div key={v.id ?? i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
-                        <School size={15} className="text-slate-400 mt-0.5 shrink-0"/>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800 leading-snug">{escola.name || v.escola || '—'}</p>
-                          {v.atuacao && <p className="text-xs text-slate-500 mt-0.5">{v.atuacao}</p>}
-                          {v.vinculo_empregaticio && !/e-?mail/i.test(v.vinculo_empregaticio) && (
-                            <p className="text-xs text-slate-400">{v.vinculo_empregaticio}</p>
-                          )}
-                          {v.turno && !/turno/i.test(v.turno) && (
-                            <p className="text-xs text-slate-400">Turno: {v.turno}</p>
-                          )}
-                          {v.formacao && (
-                            <p className="text-xs text-violet-600 mt-0.5 flex items-center gap-1"><GraduationCap size={11}/>{v.formacao}</p>
-                          )}
-                        </div>
-                        {escola.tipo && <Badge className={TIPO_COLORS[escola.tipo] || 'bg-slate-50 text-slate-600 border-slate-200'}>{escola.tipo}</Badge>}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Sem dados */}
-            {(servidor.servidor_vinculos ?? []).length === 0 && (servidor.servidor_matriculas ?? []).length === 0 && (
-              <p className="text-sm text-slate-400 italic text-center py-4">Nenhum vínculo ou matrícula registrado.</p>
-            )}
           </div>
-        )}
+        </div>
+        <div className="p-5 space-y-3">
+          {servidor.escola&&(
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+              <School size={15} className="text-slate-400 shrink-0"/>
+              <div>
+                <p className="text-sm font-medium text-slate-700">{servidor.escola.name}</p>
+                <Badge className={TIPO_COLORS[servidor.escola.tipo]}>{servidor.escola.tipo}</Badge>
+              </div>
+            </div>
+          )}
+          {(servidor.email||servidor.telefone)&&(
+            <div className="p-3 bg-slate-50 rounded-xl space-y-1">
+              {servidor.email&&<p className="text-sm text-slate-600"><span className="text-slate-400 text-xs w-16 inline-block">Email</span>{servidor.email}</p>}
+              {servidor.telefone&&<p className="text-sm text-slate-600"><span className="text-slate-400 text-xs w-16 inline-block">Telefone</span>{servidor.telefone}</p>}
+            </div>
+          )}
+          {servidor.observacoes&&(
+            <div className="p-3 bg-amber-50 rounded-xl">
+              <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">Observações</p>
+              <p className="text-sm text-amber-800">{servidor.observacoes}</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -280,7 +490,7 @@ function ServidorModal({ servidorId, onClose }) {
 
 // ─── SEARCH OVERLAY ──────────────────────────────────────────────────────────
 
-function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
+function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) {
   const [query,setQuery]=useState('')
   const [results,setResults]=useState({profs:[],escolas:[],servidores:[]})
   const [searching,setSearching]=useState(false)
@@ -291,7 +501,7 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
     const t=setTimeout(async()=>{const r=await buscarGlobal(query);setResults(r);setSearching(false)},250)
     return()=>clearTimeout(t)
   },[query])
-  const hasResults=(results.profs??[]).length>0||(results.escolas??[]).length>0||(results.servidores??[]).length>0
+  const hasResults=results.profs.length>0||results.escolas.length>0||results.servidores.length>0
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 p-4 bg-black/30 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden" onClick={e=>e.stopPropagation()}>
@@ -303,10 +513,10 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
         <div className="max-h-96 overflow-y-auto">
           {query.length>=2&&!searching&&!hasResults&&<p className="text-center py-10 text-sm text-slate-400">Nenhum resultado para "{query}"</p>}
           {query.length<2&&<p className="text-center py-10 text-sm text-slate-400">Digite ao menos 2 letras para buscar</p>}
-          {(results.escolas??[]).length>0&&(
+          {results.escolas.length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Escolas</p>
-              {(results.escolas??[]).map(s=>(
+              {results.escolas.map(s=>(
                 <button key={s.id} onClick={()=>{onSelectSchool(s);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
                   <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center"><School size={14} className="text-slate-500"/></div>
                   <div><p className="text-sm font-medium text-slate-700">{s.name}</p><p className="text-xs text-slate-400">{s.tipo}</p></div>
@@ -314,10 +524,10 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
               ))}
             </div>
           )}
-          {(results.profs??[]).length>0&&(
+          {results.profs.length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Professores</p>
-              {(results.profs??[]).map(p=>{
+              {results.profs.map(p=>{
                 const esc=(p.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean)
                 return (
                   <button key={p.id} onClick={()=>{onOpenProf(p);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
@@ -329,13 +539,13 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
               })}
             </div>
           )}
-          {(results.servidores??[]).length>0&&(
+          {results.servidores.length>0&&(
             <div className="p-2">
-              <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Servidores</p>
-              {(results.servidores??[]).map(s=>(
-                <button key={s.id} onClick={()=>{onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
+              <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Servidores T&A</p>
+              {results.servidores.map(s=>(
+                <button key={s.id} onClick={()=>{onOpenServidor(s);onClose()}} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left">
                   <AvatarCircle name={s.nome} size="sm"/>
-                  <div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-700">{s.nome}</p></div>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-700">{s.nome}</p><p className="text-xs text-slate-400">{s.cargo} · {s.escola?.name}</p></div>
                 </button>
               ))}
             </div>
@@ -361,8 +571,8 @@ function Dashboard({ onSelectSchool }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           {label:'Escolas',val:stats?.totalEscolas,icon:School,bg:'bg-slate-50',text:'text-slate-800',ib:'bg-slate-200 text-slate-600'},
-          {label:'Professores',val:stats?.totalProfs,icon:Users,bg:'bg-blue-50',text:'text-blue-800',ib:'bg-blue-200 text-blue-700'},
-          {label:'Total Nomeações',val:stats?.totalNomeacoes,icon:Briefcase,bg:'bg-violet-50',text:'text-violet-800',ib:'bg-violet-200 text-violet-700'},
+          {label:'Professores',val:stats?.totalProfs,icon:GraduationCap,bg:'bg-blue-50',text:'text-blue-800',ib:'bg-blue-200 text-blue-700'},
+          {label:'Servidores T&A',val:stats?.totalServidores,icon:Users,bg:'bg-violet-50',text:'text-violet-800',ib:'bg-violet-200 text-violet-700'},
           {label:'Duplas Nomeações',val:stats?.duplos,icon:ArrowRightLeft,bg:'bg-amber-50',text:'text-amber-800',ib:'bg-amber-200 text-amber-700'},
         ].map(({label,val,icon:Icon,bg,text,ib})=>(
           <div key={label} className={`${bg} rounded-2xl p-5`}>
@@ -432,9 +642,7 @@ function SchoolsGrid({ onSelectSchool }) {
         {filtered.map(escola=>(
           <div key={escola.id} onClick={()=>onSelectSchool(escola)} className="group p-5 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-md cursor-pointer transition-all">
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-slate-900 transition-colors">
-                <School size={17} className="text-slate-500 group-hover:text-white transition-colors"/>
-              </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-slate-900 transition-colors"><School size={17} className="text-slate-500 group-hover:text-white transition-colors"/></div>
               <Badge className={TIPO_COLORS[escola.tipo]}>{escola.tipo}</Badge>
             </div>
             <h3 className="text-sm font-semibold text-slate-800 leading-snug mb-4">{escola.name}</h3>
@@ -485,18 +693,14 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>onOpenProf(prof)}>
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-slate-800">{prof.nome}</p>
-                    {(prof.nomeacoesAqui??[]).length>1&&<Badge className="bg-violet-50 text-violet-600 border-violet-200">{prof.nomeacoesAqui.length}× nomeações</Badge>}
+                    {prof.nomeacoesAqui?.length>1&&<Badge className="bg-violet-50 text-violet-600 border-violet-200">{prof.nomeacoesAqui.length}× nomeações</Badge>}
                     {outra&&<Badge className="bg-blue-50 text-blue-600 border-blue-200"><Briefcase size={10}/> 2ª escola</Badge>}
                   </div>
                   {outra&&<p className="text-xs text-slate-400 mt-0.5 truncate">Também em: {outra.escola?.name}</p>}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button onClick={()=>salvarEfe(prof.id,'ok',null)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all ${efeProf?.status==='ok'?'bg-emerald-500 text-white':'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'}`}>
-                    <CheckCircle2 size={13}/> OK
-                  </button>
-                  <button onClick={()=>salvarEfe(prof.id,'ocorrencia','Falta')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all ${efeProf?.status==='ocorrencia'?'bg-amber-400 text-white':'bg-slate-100 text-slate-500 hover:bg-amber-50 hover:text-amber-600'}`}>
-                    <AlertCircle size={13}/> {efeProf?.ocorrencia??'Ocorrência'}
-                  </button>
+                  <button onClick={()=>salvarEfe(prof.id,'ok',null)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all ${efeProf?.status==='ok'?'bg-emerald-500 text-white':'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'}`}><CheckCircle2 size={13}/> OK</button>
+                  <button onClick={()=>salvarEfe(prof.id,'ocorrencia','Falta')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all ${efeProf?.status==='ocorrencia'?'bg-amber-400 text-white':'bg-slate-100 text-slate-500 hover:bg-amber-50 hover:text-amber-600'}`}><AlertCircle size={13}/>{efeProf?.ocorrencia??'Ocorrência'}</button>
                   {saving&&<Loader2 size={13} className="animate-spin text-slate-400"/>}
                 </div>
                 <ChevronRight size={16} className="text-slate-300 shrink-0 cursor-pointer" onClick={()=>onOpenProf(prof)}/>
@@ -511,11 +715,11 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
 
 // ─── PROFESSORES LIST ────────────────────────────────────────────────────────
 
-function ProfessoresList({ onOpenProf }) {
+function ProfessoresList({ onOpenProf, adminMode, escolas }) {
   const {professores,loading,reload}=useProfessores()
-  const {escolas}=useEscolas()
   const [search,setSearch]=useState('')
   const [escolaFiltro,setEscolaFiltro]=useState('Todas')
+  const [showForm,setShowForm]=useState(false)
   const filtered=useMemo(()=>{
     const q=search.toLowerCase()
     return professores.filter(p=>(search===''||p.nome.toLowerCase().includes(q))&&(escolaFiltro==='Todas'||(p.nomeacoes??[]).some(n=>n.escola?.name===escolaFiltro)))
@@ -524,8 +728,11 @@ function ProfessoresList({ onOpenProf }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-xl font-semibold text-slate-900">Todos os Professores</h1><p className="text-sm text-slate-500 mt-0.5">{professores.length} cadastrados na rede</p></div>
-        <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" title="Recarregar"><RefreshCw size={16} className="text-slate-500"/></button>
+        <div><h1 className="text-xl font-semibold text-slate-900">Professores</h1><p className="text-sm text-slate-500 mt-0.5">{professores.length} cadastrados · rede municipal</p></div>
+        <div className="flex gap-2">
+          <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" title="Recarregar"><RefreshCw size={16} className="text-slate-500"/></button>
+          {adminMode&&<button onClick={()=>setShowForm(true)} className="flex items-center gap-1.5 px-3 py-2 bg-slate-950 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors"><UserPlus size={15}/> Novo</button>}
+        </div>
       </div>
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 flex-1">
@@ -560,80 +767,78 @@ function ProfessoresList({ onOpenProf }) {
           )
         })}
       </div>
+      {showForm&&<FormProfessor escolas={escolas} onClose={()=>setShowForm(false)} onSaved={reload}/>}
     </div>
   )
 }
 
-// ─── SERVIDORES LIST ─────────────────────────────────────────────────────────
+// ─── SERVIDORES LIST (técnico-administrativo APENAS) ─────────────────────────
 
-function ServidoresList({ onOpenServidor }) {
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  // debounce para não disparar query a cada tecla
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(t)
-  }, [search])
-
-  const { servidores, loading, reload } = useServidores({ query: debouncedSearch, limit: 500 })
-
-  // Filtra: só mostra quem tem pelo menos 1 vínculo que NÃO seja docente
-  // Como useServidores retorna só id+nome (sem vinculos), usamos a lista completa
-  // e deixamos o filtro de docente para o modal. Aqui mostramos todos os servidores
-  // (a separação professor/servidor é feita pela origem dos dados: professores vêm
-  // da tabela `professores`, servidores vêm da tabela `servidores`).
-
-  if (loading) return <Spinner/>
-
+function ServidoresList({ onOpenServidor, adminMode, escolas }) {
+  const {servidores,loading,reload}=useServidores()
+  const [search,setSearch]=useState('')
+  const [escolaFiltro,setEscolaFiltro]=useState('Todas')
+  const [showForm,setShowForm]=useState(false)
+  const filtered=useMemo(()=>{
+    const q=search.toLowerCase()
+    return servidores.filter(s=>(search===''||s.nome.toLowerCase().includes(q))&&(escolaFiltro==='Todas'||s.escola?.name===escolaFiltro))
+  },[servidores,search,escolaFiltro])
+  if(loading)return<Spinner/>
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Servidores</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Administrativo · Merendeiras · Serventes · e outros</p>
+          <p className="text-sm text-slate-500 mt-0.5">Pessoal técnico e administrativo · {servidores.length} cadastrados</p>
         </div>
-        <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" title="Recarregar">
-          <RefreshCw size={16} className="text-slate-500"/>
-        </button>
+        <div className="flex gap-2">
+          <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><RefreshCw size={16} className="text-slate-500"/></button>
+          {adminMode&&<button onClick={()=>setShowForm(true)} className="flex items-center gap-1.5 px-3 py-2 bg-slate-950 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors"><UserPlus size={15}/> Novo</button>}
+        </div>
       </div>
-
-      <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2">
-        <Search size={15} className="text-slate-400"/>
-        <input
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-          placeholder="Buscar servidor..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        {search && <button onClick={() => setSearch('')}><X size={14} className="text-slate-400"/></button>}
+      {/* Info box deixando claro a separação */}
+      <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+        <Users size={16} className="text-slate-500 shrink-0"/>
+        <p className="text-xs text-slate-600">Esta lista é exclusiva para pessoal técnico-administrativo: merendeiras, serventes, secretários, vigilantes, etc. Professores possuem cadastro próprio no menu <strong>Professores</strong>.</p>
       </div>
-
-      <p className="text-xs text-slate-400">{servidores.length} servidor{servidores.length !== 1 ? 'es' : ''} encontrado{servidores.length !== 1 ? 's' : ''}</p>
-
-      {servidores.length === 0 && !loading && (
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 flex-1">
+          <Search size={15} className="text-slate-400"/>
+          <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar servidor..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          {search&&<button onClick={()=>setSearch('')}><X size={14} className="text-slate-400"/></button>}
+        </div>
+        <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)} className="px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+          <option>Todas</option>
+          {escolas.map(e=><option key={e.id}>{e.name}</option>)}
+        </select>
+      </div>
+      {filtered.length===0&&!loading?(
         <div className="text-center py-16 text-slate-400">
-          <UserCog size={32} className="mx-auto mb-2 opacity-30"/>
-          <p className="text-sm">Nenhum servidor encontrado</p>
-          <p className="text-xs mt-1 text-slate-300">Verifique se os dados foram importados no Supabase</p>
+          <Users size={32} className="mx-auto mb-2 opacity-30"/>
+          <p className="text-sm">Nenhum servidor técnico-administrativo cadastrado ainda.</p>
+          {adminMode&&<button onClick={()=>setShowForm(true)} className="mt-3 flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors mx-auto"><Plus size={14}/> Cadastrar primeiro servidor</button>}
+        </div>
+      ):(
+        <div className="space-y-2">
+          {filtered.map(serv=>(
+            <div key={serv.id} onClick={()=>onOpenServidor(serv)} className="group flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all">
+              <AvatarCircle name={serv.nome}/>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-slate-800">{serv.nome}</p>
+                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs ${serv.status==='Ativo'?'text-emerald-600':'text-amber-600'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${serv.status==='Ativo'?'bg-emerald-500':'bg-amber-400'}`}/>{serv.status}
+                  </span>
+                  {serv.cargo&&<Badge className="bg-slate-100 text-slate-600 border-slate-200">{serv.cargo}</Badge>}
+                </div>
+                <p className="text-xs text-slate-400 truncate mt-0.5">{serv.escola?.name??'Escola não vinculada'}</p>
+              </div>
+              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0"/>
+            </div>
+          ))}
         </div>
       )}
-
-      <div className="space-y-2">
-        {servidores.map(s => (
-          <div
-            key={s.id}
-            onClick={() => onOpenServidor(s.id)}
-            className="group flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-sm cursor-pointer transition-all"
-          >
-            <AvatarCircle name={s.nome}/>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800">{s.nome}</p>
-            </div>
-            <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-500 transition-colors shrink-0"/>
-          </div>
-        ))}
-      </div>
+      {showForm&&<FormServidor escolas={escolas} onClose={()=>setShowForm(false)} onSaved={reload}/>}
     </div>
   )
 }
@@ -679,9 +884,7 @@ function EfeModule({ onOpenProf }) {
                 <p className="text-xs text-slate-400 truncate">{esc.join(' · ')}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={()=>escolaSel&&salvarEfe(prof.id,'ok',null)} disabled={!escolaSel} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all disabled:opacity-40 ${efeProf?.status==='ok'?'bg-emerald-500 text-white':'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'}`}>
-                  <CheckCircle2 size={13}/> OK
-                </button>
+                <button onClick={()=>escolaSel&&salvarEfe(prof.id,'ok',null)} disabled={!escolaSel} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all disabled:opacity-40 ${efeProf?.status==='ok'?'bg-emerald-500 text-white':'bg-slate-100 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600'}`}><CheckCircle2 size={13}/> OK</button>
                 <select disabled={!escolaSel} value={efeProf?.status==='ocorrencia'?efeProf.ocorrencia:''} onChange={e=>escolaSel&&salvarEfe(prof.id,'ocorrencia',e.target.value)} className={`px-2 py-1.5 rounded-xl text-xs font-medium outline-none cursor-pointer disabled:opacity-40 ${efeProf?.status==='ocorrencia'?'bg-amber-400 text-white':'bg-slate-100 text-slate-500'}`}>
                   <option value="">Ocorrência</option>
                   {OCORRENCIAS.map(o=><option key={o}>{o}</option>)}
@@ -699,17 +902,20 @@ function EfeModule({ onOpenProf }) {
 
 export default function App() {
   const {user,profile,loading,signOut}=useAuth()
+  const {escolas}=useEscolas()
   const [view,setView]=useState('dashboard')
   const [selectedSchool,setSelectedSchool]=useState(null)
   const [selectedProf,setSelectedProf]=useState(null)
-  const [selectedServidorId,setSelectedServidorId]=useState(null)
+  const [editProf,setEditProf]=useState(null)
+  const [selectedServidor,setSelectedServidor]=useState(null)
+  const [editServidor,setEditServidor]=useState(null)
   const [searchOpen,setSearchOpen]=useState(false)
   const [sidebarOpen,setSidebarOpen]=useState(true)
+  const admin=isAdmin(profile)
 
   useEffect(()=>{
     const h=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();setSearchOpen(true)}}
-    window.addEventListener('keydown',h)
-    return()=>window.removeEventListener('keydown',h)
+    window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h)
   },[])
 
   if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={32} className="animate-spin text-slate-400"/></div>
@@ -721,8 +927,8 @@ export default function App() {
   const navItems=[
     {id:'dashboard',label:'Dashboard',icon:Home},
     {id:'schools',label:'Unidades',icon:School},
-    {id:'professores',label:'Professores',icon:Users},
-    {id:'servidores',label:'Servidores',icon:UserCog},
+    {id:'professores',label:'Professores',icon:GraduationCap},
+    {id:'servidores',label:'Servidores T&A',icon:Users},
     {id:'efe',label:'Efetividade',icon:CheckCircle2},
     {id:'relatorios',label:'Relatórios',icon:FileText},
   ]
@@ -761,29 +967,34 @@ export default function App() {
         <header className="h-14 bg-white border-b border-slate-100 flex items-center gap-3 px-4 shrink-0 sticky top-0 z-20">
           <button onClick={()=>setSidebarOpen(!sidebarOpen)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><Menu size={17} className="text-slate-500"/></button>
           <button onClick={()=>setSearchOpen(true)} className="flex-1 max-w-sm flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-400 hover:bg-slate-200 transition-colors">
-            <Search size={14}/><span className="flex-1 text-left">Buscar professor, servidor ou escola...</span>
+            <Search size={14}/><span className="flex-1 text-left">Buscar...</span>
             <kbd className="text-xs bg-white border border-slate-200 px-1.5 py-0.5 rounded-md font-mono">⌘K</kbd>
           </button>
           <div className="ml-auto">
-            <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center text-xs font-semibold text-white">
-              {initials(profile?.nome||user?.email||'U')}
-            </div>
+            <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center text-xs font-semibold text-white">{initials(profile?.nome||user?.email||'U')}</div>
           </div>
         </header>
         <main className="flex-1 p-6 max-w-5xl w-full">
           {view==='dashboard'&&<Dashboard onSelectSchool={handleSelectSchool}/>}
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenProf={setSelectedProf}/>}
-          {view==='professores'&&<ProfessoresList onOpenProf={setSelectedProf}/>}
-          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidorId}/>}
+          {view==='professores'&&<ProfessoresList onOpenProf={setSelectedProf} adminMode={admin} escolas={escolas}/>}
+          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} adminMode={admin} escolas={escolas}/>}
           {view==='efe'&&<EfeModule onOpenProf={setSelectedProf}/>}
           {view==='relatorios'&&<div className="flex items-center justify-center h-64 text-slate-400"><div className="text-center"><FileText size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Relatórios · em breve</p></div></div>}
         </main>
       </div>
 
-      {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenProf={p=>{setSelectedProf(p)}}/>}
-      {selectedProf&&<ProfessorModal prof={selectedProf} onClose={()=>setSelectedProf(null)}/>}
-      {selectedServidorId&&<ServidorModal servidorId={selectedServidorId} onClose={()=>setSelectedServidorId(null)}/>}
+      {/* Search */}
+      {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenProf={p=>{setSelectedProf(p)}} onOpenServidor={s=>{setSelectedServidor(s)}}/>}
+
+      {/* Professor modal/form */}
+      {selectedProf&&!editProf&&<ProfessorModal prof={selectedProf} onClose={()=>setSelectedProf(null)} onEdit={p=>{setEditProf(p);setSelectedProf(null)}} isAdmin={admin}/>}
+      {editProf&&<FormProfessor prof={editProf} escolas={escolas} onClose={()=>setEditProf(null)} onSaved={()=>{}}/>}
+
+      {/* Servidor modal/form */}
+      {selectedServidor&&!editServidor&&<ServidorModal servidor={selectedServidor} onClose={()=>setSelectedServidor(null)} onEdit={s=>{setEditServidor(s);setSelectedServidor(null)}} isAdmin={admin}/>}
+      {editServidor&&<FormServidor servidor={editServidor} escolas={escolas} onClose={()=>setEditServidor(null)} onSaved={()=>{}}/>}
     </div>
   )
 }
