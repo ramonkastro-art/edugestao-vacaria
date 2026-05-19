@@ -1172,12 +1172,8 @@ function ServidoresList({ onOpenServidor }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">
-            Informações Pessoais
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Administrativo · Merendeiras · Serventes · e outros
-          </p>
+          <h1 className="text-xl font-semibold text-slate-900">Ficha</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Dados Cadastrais</p>
         </div>
         <button
           onClick={reload}
