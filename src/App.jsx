@@ -1,3 +1,4 @@
+import Footer from "./components/Footer";
 import { useState, useMemo, useEffect } from "react";
 import {
   Search,
@@ -1160,11 +1161,34 @@ function ServidoresList({ onOpenServidor }) {
     limit: 500,
   });
 
-  // Filtra: só mostra quem tem pelo menos 1 vínculo que NÃO seja docente
-  // Como useServidores retorna só id+nome (sem vinculos), usamos a lista completa
-  // e deixamos o filtro de docente para o modal. Aqui mostramos todos os servidores
-  // (a separação professor/servidor é feita pela origem dos dados: professores vêm
-  // da tabela `professores`, servidores vêm da tabela `servidores`).
+  // filtro opcional: 'todos' | 'nao-docentes' | 'docentes'
+  const [filterType, setFilterType] = useState("todos");
+
+  const filtered = useMemo(() => {
+    const q = (debouncedSearch || "").toLowerCase();
+    const base = servidores || [];
+    const bySearch = q
+      ? base.filter((s) => (s.nome || "").toLowerCase().includes(q))
+      : base;
+    if (filterType === "todos") return bySearch;
+    return bySearch.filter((s) => {
+      const vincs = s.servidor_vinculos || [];
+      const isDocente = vincs.some((v) => {
+        const a = (v.atuacao || v.cargo || "").toLowerCase();
+        return [
+          "prof",
+          "dire",
+          "coord",
+          "vice",
+          "orient",
+          "superv",
+          "pedagog",
+          "docent",
+        ].some((k) => a.includes(k));
+      });
+      return filterType === "docentes" ? isDocente : !isDocente;
+    });
+  }, [servidores, debouncedSearch, filterType]);
 
   if (loading) return <Spinner />;
 
@@ -1184,27 +1208,39 @@ function ServidoresList({ onOpenServidor }) {
         </button>
       </div>
 
-      <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2">
-        <Search size={15} className="text-slate-400" />
-        <input
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-          placeholder="Buscar servidor..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        {search && (
-          <button onClick={() => setSearch("")}>
-            <X size={14} className="text-slate-400" />
-          </button>
-        )}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 flex-1">
+          <Search size={15} className="text-slate-400" />
+          <input
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+            placeholder="Buscar servidor..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button onClick={() => setSearch("")}>
+              <X size={14} className="text-slate-400" />
+            </button>
+          )}
+        </div>
+
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="ml-3 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-600"
+        >
+          <option value="todos">Todos</option>
+          <option value="nao-docentes">Apenas não-docentes</option>
+          <option value="docentes">Apenas docentes</option>
+        </select>
       </div>
 
       <p className="text-xs text-slate-400">
-        {servidores.length} servidor{servidores.length !== 1 ? "es" : ""}{" "}
-        encontrado{servidores.length !== 1 ? "s" : ""}
+        {filtered.length} servidor{filtered.length !== 1 ? "es" : ""} encontrado
+        {filtered.length !== 1 ? "s" : ""}
       </p>
 
-      {servidores.length === 0 && !loading && (
+      {filtered.length === 0 && !loading && (
         <div className="text-center py-16 text-slate-400">
           <UserCog size={32} className="mx-auto mb-2 opacity-30" />
           <p className="text-sm">Nenhum servidor encontrado</p>
@@ -1215,7 +1251,7 @@ function ServidoresList({ onOpenServidor }) {
       )}
 
       <div className="space-y-2">
-        {servidores.map((s) => (
+        {filtered.map((s) => (
           <div
             key={s.id}
             onClick={() => onOpenServidor(s.id)}
@@ -1224,6 +1260,12 @@ function ServidoresList({ onOpenServidor }) {
             <AvatarCircle name={s.nome} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-800">{s.nome}</p>
+              <div className="text-xs text-slate-400">
+                {(s.servidor_vinculos || [])
+                  .map((v) => v.atuacao || v.cargo)
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
             </div>
             <ChevronRight
               size={16}
@@ -1404,7 +1446,7 @@ export default function App() {
     { id: "dashboard", label: "Dashboard", icon: Home },
     { id: "schools", label: "Unidades", icon: School },
     { id: "professores", label: "Professores", icon: Users },
-    { id: "servidores", label: "Servidores", icon: UserCog },
+    { id: "servidores", label: "Dados Cadastrais", icon: UserCog },
     { id: "efe", label: "Efetividade", icon: CheckCircle2 },
     { id: "relatorios", label: "Relatórios", icon: FileText },
   ];
@@ -1552,6 +1594,7 @@ export default function App() {
           onClose={() => setSelectedServidorId(null)}
         />
       )}
+      <Footer />
     </div>
   );
 }
