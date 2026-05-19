@@ -266,22 +266,58 @@ export function useServidores({ query = "", limit = 500 } = {}) {
   return { servidores, loading, error, reload: load };
 }
 
-// ─── useServidorDetalhes (detalhes por id: servidor + vínculos + matriculas) ──
-
-/**
- * useServidorDetalhes
- * Fetch detalhado de um servidor: linha de 'servidores' + vínculos + matriculas.
- * Retorna { servidor, vinculos, matriculas, loading, error, reload }
- *
- * Observação: ajuste os nomes das tabelas ('servidores', 'servidor_vinculos', 'servidor_matriculas')
- * caso no seu Supabase os objetos tenham nomes diferentes.
- */
 export function useServidorDetalhes(servidorId) {
   const [servidor, setServidor] = useState(null);
   const [vinculos, setVinculos] = useState([]);
   const [matriculas, setMatriculas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const tryFetchVinculos = async (id) => {
+    // possíveis nomes de coluna usados em bancos diferentes
+    const candidatoCols = [
+      "servidor_id",
+      "servidorid",
+      "servidores_id",
+      "servidor",
+      "servidorId",
+    ];
+    for (const col of candidatoCols) {
+      try {
+        // selecionamos tudo para evitar 400 por coluna inexistente
+        const { data, error } = await supabase
+          .from("servidor_vinculos")
+          .select("*")
+          .eq(col, id)
+          .order("id", { ascending: true })
+          .limit(1000);
+
+        if (error) {
+          const msg = (error?.message || "").toLowerCase();
+          // erro de coluna/relação -> tentar próximo candidato
+          if (msg.includes("column") || msg.includes("relation")) {
+            continue;
+          }
+          // outro erro -> propagar
+          throw error;
+        }
+
+        // sucesso (mesmo que data seja [])
+        return { data: data ?? [], usedColumn: col };
+      } catch (err) {
+        const msg = (err?.message || "").toLowerCase();
+        if (msg.includes("column") || msg.includes("relation")) {
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    // nenhum candidato funcionou
+    throw new Error(
+      "Nenhuma coluna candidata funcionou para filtrar servidor_vinculos",
+    );
+  };
 
   const load = useCallback(async () => {
     if (!servidorId) {
@@ -296,7 +332,7 @@ export function useServidorDetalhes(servidorId) {
     setError(null);
 
     try {
-      // 1) servidor (linha principal)
+      // 1) buscar a linha do servidor
       const { data: sData, error: sError } = await supabase
         .from("servidores")
         .select("*")
@@ -305,27 +341,31 @@ export function useServidorDetalhes(servidorId) {
 
       if (sError) throw sError;
 
-      // 2) vínculos (busca separada para evitar problemas de embed)
-      const { data: vData, error: vError } = await supabase
-        .from("servidor_vinculos")
-        .select(
-          "id, servidor_id, cargo, atuacao, escola, turno, tipo_vinculo, ativo",
-        )
-        .eq("servidor_id", servidorId)
-        .order("id", { ascending: true });
+      // 2) tentar buscar vínculos (com fallback de colunas)
+      let vData = [];
+      try {
+        const res = await tryFetchVinculos(servidorId);
+        vData = res.data;
+      } catch (vErr) {
+        // não quebrar a página — registra e segue com vinculos vazios
+        console.warn("Não foi possível buscar servidor_vinculos:", vErr);
+      }
 
-      if (vError) throw vError;
+      // 3) buscar matriculas (usando select * para evitar erro de coluna inexistente)
+      let mData = [];
+      try {
+        const { data: md, error: mErr } = await supabase
+          .from("servidor_matriculas")
+          .select("*")
+          .eq("servidor_id", servidorId)
+          .order("data_inicio", { ascending: true })
+          .limit(1000);
 
-      // 3) matriculas (se existir)
-      const { data: mData, error: mError } = await supabase
-        .from("servidor_matriculas")
-        .select(
-          "id, matricula_raw, matricula_norm, data_inicio, area_nomeacao, nivel",
-        )
-        .eq("servidor_id", servidorId)
-        .order("data_inicio", { ascending: true });
-
-      if (mError) throw mError;
+        if (mErr) throw mErr;
+        mData = md ?? [];
+      } catch (mErr) {
+        console.warn("Erro ao buscar servidor_matriculas:", mErr);
+      }
 
       setServidor(sData ?? null);
       setVinculos(vData ?? []);
