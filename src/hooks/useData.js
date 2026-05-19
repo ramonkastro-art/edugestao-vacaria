@@ -201,29 +201,31 @@ export function useServidores({ query = "", limit = 500 } = {}) {
     setLoading(true);
     setError(null);
 
-    // Busca leve: pega somente a base do servidor (sem expandir tudo) para não pesar.
-    // Se você quiser exibir a escola/atuação na lista, pode trocar o select por um join em servidor_vinculos.
-    // antigo: .select("id, nome")
-    let q = supabase
-      .from("servidores")
-      .select("id, nome, servidor_vinculos ( id, atuacao, cargo )")
-      .order("nome")
-      .limit(limit);
+    try {
+      let q = supabase
+        .from("servidores")
+        .select("id, nome")
+        .order("nome")
+        .limit(limit);
 
-    if (query && query.trim().length >= 2) {
-      q = q.ilike("nome", `%${query.trim()}%`);
-    }
+      if (query && query.trim().length >= 2) {
+        q = q.ilike("nome", `%${query.trim()}%`);
+      }
 
-    const { data, error } = await q;
-    if (error) {
-      setError(error);
+      const { data, error } = await q;
+
+      if (error) {
+        setError(error);
+        setServidores([]);
+      } else {
+        setServidores(data ?? []);
+      }
+    } catch (err) {
+      setError(err);
       setServidores([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setServidores(data ?? []);
-    setLoading(false);
   }, [query, limit]);
 
   useEffect(() => {
@@ -231,63 +233,6 @@ export function useServidores({ query = "", limit = 500 } = {}) {
   }, [load]);
 
   return { servidores, loading, error, reload: load };
-}
-
-export function useServidorDetalhes(servidorId) {
-  const [servidor, setServidor] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const load = useCallback(async () => {
-    if (!servidorId) return;
-    setLoading(true);
-    setError(null);
-
-    const { data, error } = await supabase
-      .from("servidores")
-      .select(
-        `
-        *,
-        servidor_matriculas ( * ),
-        servidor_vinculos ( * )
-      `,
-      )
-      .eq("id", servidorId)
-      .single();
-
-    if (error) {
-      setError(error);
-      setServidor(null);
-      setLoading(false);
-      return;
-    }
-
-    // ordenações úteis
-    const mats = (data?.servidor_matriculas ?? []).slice().sort((a, b) => {
-      const da = a.data_inicio || "";
-      const db = b.data_inicio || "";
-      return String(db).localeCompare(String(da));
-    });
-
-    const vincs = (data?.servidor_vinculos ?? []).slice().sort((a, b) => {
-      const ea = a.escola?.name || "";
-      const eb = b.escola?.name || "";
-      return ea.localeCompare(eb, "pt-BR");
-    });
-
-    setServidor({
-      ...data,
-      servidor_matriculas: mats,
-      servidor_vinculos: vincs,
-    });
-    setLoading(false);
-  }, [servidorId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  return { servidor, loading, error, reload: load };
 }
 
 // ─── BUSCA GLOBAL ─────────────────────────────────────────────────────────────
