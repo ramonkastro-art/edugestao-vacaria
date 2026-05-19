@@ -15,7 +15,8 @@ export function useEscolas() {
       .then(({ data }) => {
         setEscolas(data ?? []);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   return { escolas, loading };
@@ -29,10 +30,11 @@ export function useProfessores() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("professores")
-      .select(
-        `
+    try {
+      const { data } = await supabase
+        .from("professores")
+        .select(
+          `
         id, nome, status, email, telefone, formacao,
         regencia_h, htp_h, hti_h,
         nomeacoes (
@@ -40,10 +42,15 @@ export function useProfessores() {
           escola:escolas ( id, name, tipo )
         )
       `,
-      )
-      .order("nome");
-    setProfessores(data ?? []);
-    setLoading(false);
+        )
+        .order("nome");
+      setProfessores(data ?? []);
+    } catch (err) {
+      setProfessores([]);
+      // opcional: console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -61,6 +68,8 @@ export function useProfessoresByEscola(escolaId) {
 
   useEffect(() => {
     if (!escolaId) return;
+    setLoading(true);
+
     supabase
       .from("nomeacoes")
       .select(
@@ -95,6 +104,10 @@ export function useProfessoresByEscola(escolaId) {
           ),
         );
         setLoading(false);
+      })
+      .catch(() => {
+        setProfessores([]);
+        setLoading(false);
       });
   }, [escolaId]);
 
@@ -120,28 +133,36 @@ export function useEfetividade(escolaId, mesAno) {
           map[e.professor_id] = e;
         });
         setEfe(map);
-      });
+      })
+      .catch(() => setEfe({}));
   }, [escolaId, mesAno]);
 
   async function salvarEfe(professorId, status, ocorrencia = null) {
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    await supabase.from("efetividade").upsert(
-      {
-        professor_id: professorId,
-        escola_id: escolaId,
-        mes_ano: mesAno,
-        status,
-        ocorrencia,
-        registrado_por: user?.email,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "professor_id,escola_id,mes_ano" },
-    );
-    setEfe((prev) => ({ ...prev, [professorId]: { status, ocorrencia } }));
-    setSaving(false);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      await supabase.from("efetividade").upsert(
+        {
+          professor_id: professorId,
+          escola_id: escolaId,
+          mes_ano: mesAno,
+          status,
+          ocorrencia,
+          registrado_por: user?.email,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "professor_id,escola_id,mes_ano" },
+      );
+
+      setEfe((prev) => ({ ...prev, [professorId]: { status, ocorrencia } }));
+    } catch (err) {
+      // opcional: console.error(err);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return { efe, salvarEfe, saving };
@@ -155,33 +176,40 @@ export function useDashboardStats() {
 
   useEffect(() => {
     async function load() {
-      const [{ count: totalProfs }, { count: totalEscolas }, { data: noms }] =
-        await Promise.all([
-          supabase
-            .from("professores")
-            .select("*", { count: "exact", head: true }),
-          supabase.from("escolas").select("*", { count: "exact", head: true }),
-          supabase
-            .from("nomeacoes")
-            .select("professor_id, escola_id")
-            .eq("ativa", true),
-        ]);
+      try {
+        const [{ count: totalProfs }, { count: totalEscolas }, { data: noms }] =
+          await Promise.all([
+            supabase
+              .from("professores")
+              .select("*", { count: "exact", head: true }),
+            supabase
+              .from("escolas")
+              .select("*", { count: "exact", head: true }),
+            supabase
+              .from("nomeacoes")
+              .select("professor_id, escola_id")
+              .eq("ativa", true),
+          ]);
 
-      // professores com 2+ escolas diferentes
-      const byProf = {};
-      (noms ?? []).forEach((n) => {
-        if (!byProf[n.professor_id]) byProf[n.professor_id] = new Set();
-        byProf[n.professor_id].add(n.escola_id);
-      });
-      const duplos = Object.values(byProf).filter((s) => s.size > 1).length;
+        // professores com 2+ escolas diferentes
+        const byProf = {};
+        (noms ?? []).forEach((n) => {
+          if (!byProf[n.professor_id]) byProf[n.professor_id] = new Set();
+          byProf[n.professor_id].add(n.escola_id);
+        });
+        const duplos = Object.values(byProf).filter((s) => s.size > 1).length;
 
-      setStats({
-        totalProfs,
-        totalEscolas,
-        totalNomeacoes: noms?.length ?? 0,
-        duplos,
-      });
-      setLoading(false);
+        setStats({
+          totalProfs,
+          totalEscolas,
+          totalNomeacoes: noms?.length ?? 0,
+          duplos,
+        });
+      } catch (err) {
+        setStats(null);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -197,36 +225,39 @@ export function useServidores({ query = "", limit = 500 } = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const load = useCallback(
+    async (opts = {}) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      let q = supabase
-        .from("servidores")
-        .select("id, nome")
-        .order("nome")
-        .limit(limit);
+      try {
+        let q = supabase
+          .from("servidores")
+          .select("id, nome")
+          .order("nome")
+          .limit(limit);
 
-      if (query && query.trim().length >= 2) {
-        q = q.ilike("nome", `%${query.trim()}%`);
-      }
+        if (query && query.trim().length >= 2) {
+          q = q.ilike("nome", `%${query.trim()}%`);
+        }
 
-      const { data, error } = await q;
+        const { data, error } = await q;
 
-      if (error) {
-        setError(error);
+        if (error) {
+          setError(error);
+          setServidores([]);
+        } else {
+          setServidores(data ?? []);
+        }
+      } catch (err) {
+        setError(err);
         setServidores([]);
-      } else {
-        setServidores(data ?? []);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err);
-      setServidores([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [query, limit]);
+    },
+    [query, limit],
+  );
 
   useEffect(() => {
     load();
@@ -235,30 +266,120 @@ export function useServidores({ query = "", limit = 500 } = {}) {
   return { servidores, loading, error, reload: load };
 }
 
+// ─── useServidorDetalhes (detalhes por id: servidor + vínculos + matriculas) ──
+
+/**
+ * useServidorDetalhes
+ * Fetch detalhado de um servidor: linha de 'servidores' + vínculos + matriculas.
+ * Retorna { servidor, vinculos, matriculas, loading, error, reload }
+ *
+ * Observação: ajuste os nomes das tabelas ('servidores', 'servidor_vinculos', 'servidor_matriculas')
+ * caso no seu Supabase os objetos tenham nomes diferentes.
+ */
+export function useServidorDetalhes(servidorId) {
+  const [servidor, setServidor] = useState(null);
+  const [vinculos, setVinculos] = useState([]);
+  const [matriculas, setMatriculas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    if (!servidorId) {
+      setServidor(null);
+      setVinculos([]);
+      setMatriculas([]);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1) servidor (linha principal)
+      const { data: sData, error: sError } = await supabase
+        .from("servidores")
+        .select("*")
+        .eq("id", servidorId)
+        .single();
+
+      if (sError) throw sError;
+
+      // 2) vínculos (busca separada para evitar problemas de embed)
+      const { data: vData, error: vError } = await supabase
+        .from("servidor_vinculos")
+        .select(
+          "id, servidor_id, cargo, atuacao, escola, turno, tipo_vinculo, ativo",
+        )
+        .eq("servidor_id", servidorId)
+        .order("id", { ascending: true });
+
+      if (vError) throw vError;
+
+      // 3) matriculas (se existir)
+      const { data: mData, error: mError } = await supabase
+        .from("servidor_matriculas")
+        .select(
+          "id, matricula_raw, matricula_norm, data_inicio, area_nomeacao, nivel",
+        )
+        .eq("servidor_id", servidorId)
+        .order("data_inicio", { ascending: true });
+
+      if (mError) throw mError;
+
+      setServidor(sData ?? null);
+      setVinculos(vData ?? []);
+      setMatriculas(mData ?? []);
+    } catch (err) {
+      setError(err);
+      setServidor(null);
+      setVinculos([]);
+      setMatriculas([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [servidorId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return { servidor, vinculos, matriculas, loading, error, reload: load };
+}
+
 // ─── BUSCA GLOBAL ─────────────────────────────────────────────────────────────
 
 export async function buscarGlobal(query) {
   if (!query || query.length < 2)
     return { profs: [], escolas: [], servidores: [] };
 
-  const [{ data: profs }, { data: escolas }, { data: servidores }] =
-    await Promise.all([
-      supabase
-        .from("professores")
-        .select("id, nome, status, nomeacoes(escola:escolas(id, name))")
-        .ilike("nome", `%${query}%`)
-        .limit(8),
-      supabase.from("escolas").select("*").ilike("name", `%${query}%`).limit(5),
-      supabase
-        .from("servidores")
-        .select("id, nome")
-        .ilike("nome", `%${query}%`)
-        .limit(8),
-    ]);
+  try {
+    const [{ data: profs }, { data: escolas }, { data: servidores }] =
+      await Promise.all([
+        supabase
+          .from("professores")
+          .select("id, nome, status, nomeacoes(escola:escolas(id, name))")
+          .ilike("nome", `%${query}%`)
+          .limit(8),
+        supabase
+          .from("escolas")
+          .select("*")
+          .ilike("name", `%${query}%`)
+          .limit(5),
+        supabase
+          .from("servidores")
+          .select("id, nome")
+          .ilike("nome", `%${query}%`)
+          .limit(8),
+      ]);
 
-  return {
-    profs: profs ?? [],
-    escolas: escolas ?? [],
-    servidores: servidores ?? [],
-  };
+    return {
+      profs: profs ?? [],
+      escolas: escolas ?? [],
+      servidores: servidores ?? [],
+    };
+  } catch (err) {
+    // opcional: console.error(err);
+    return { profs: [], escolas: [], servidores: [] };
+  }
 }
