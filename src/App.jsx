@@ -667,7 +667,7 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf }) {
           {(results.servidores ?? []).length > 0 && (
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">
-                Servidores
+                Informações Pessoais
               </p>
               {(results.servidores ?? []).map((s) => (
                 <button
@@ -1143,7 +1143,7 @@ function ProfessoresList({ onOpenProf }) {
   );
 }
 
-// ─── FICHA LIST ─────────────────────────────────────────────────────────
+// ─── SERVIDORES LIST ─────────────────────────────────────────────────────────
 
 function ServidoresList({ onOpenServidor }) {
   const [search, setSearch] = useState("");
@@ -1172,9 +1172,7 @@ function ServidoresList({ onOpenServidor }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">
-            Ficha Cadastral
-          </h1>
+          <h1 className="text-xl font-semibold text-slate-900">Servidores</h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Administrativo · Merendeiras · Serventes · e outros
           </p>
