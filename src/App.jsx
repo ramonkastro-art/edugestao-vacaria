@@ -1,11 +1,11 @@
 import Footer from "./components/Footer";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search, School, Users, Home, FileText, LogOut,
   CheckCircle2, AlertCircle, ArrowRightLeft, X,
   Menu, ChevronRight, GraduationCap, Briefcase,
   Loader2, RefreshCw, Shield, UserCog, Phone,
-  MapPin, Calendar, Hash, Info, ChevronDown,
+  MapPin, Calendar, Hash, Info,
 } from "lucide-react";
 import { useAuth } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
@@ -73,43 +73,36 @@ function Spinner() {
 }
 function RoleBadge({ role }) {
   const map = {
-    secretaria: { l:"Secretaria", c:"bg-violet-50 text-violet-700 border-violet-200" },
-    rh:         { l:"RH",         c:"bg-blue-50 text-blue-700 border-blue-200" },
-    diretor:    { l:"Diretor",    c:"bg-emerald-50 text-emerald-700 border-emerald-200" },
-    professor:  { l:"Professor",  c:"bg-slate-100 text-slate-600 border-slate-200" },
+    secretaria:{l:"Secretaria",c:"bg-violet-50 text-violet-700 border-violet-200"},
+    rh:{l:"RH",c:"bg-blue-50 text-blue-700 border-blue-200"},
+    diretor:{l:"Diretor",c:"bg-emerald-50 text-emerald-700 border-emerald-200"},
+    professor:{l:"Professor",c:"bg-slate-100 text-slate-600 border-slate-200"},
   };
-  const { l, c } = map[role] || map.professor;
+  const {l,c} = map[role]||map.professor;
   return <Badge className={c}><Shield size={10}/>{l}</Badge>;
 }
 function isAdmin(profile) {
-  return profile?.role === "secretaria" || profile?.role === "rh";
+  return profile?.role==="secretaria"||profile?.role==="rh";
 }
 
-// ─── BOTTOM NAV (mobile) ─────────────────────────────────────────────────────
+// ─── BOTTOM NAV MOBILE ───────────────────────────────────────────────────────
 
 function BottomNav({ currentView, onNavigate }) {
   const items = [
-    { id:"dashboard",   label:"Início",    icon:Home },
-    { id:"schools",     label:"Unidades",  icon:School },
-    { id:"professores", label:"Profess.",  icon:GraduationCap },
-    { id:"servidores",  label:"Cadastro",  icon:UserCog },
-    { id:"efe",         label:"EFE",       icon:CheckCircle2 },
+    {id:"dashboard",  label:"Início",   icon:Home},
+    {id:"schools",    label:"Unidades", icon:School},
+    {id:"professores",label:"Profess.", icon:GraduationCap},
+    {id:"servidores", label:"Cadastro", icon:UserCog},
+    {id:"efe",        label:"EFE",      icon:CheckCircle2},
   ];
-  const activeId = currentView === "school-detail" ? "schools" : currentView;
+  const activeId = currentView==="school-detail"?"schools":currentView;
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-100 flex md:hidden safe-area-bottom">
-      {items.map(({ id, label, icon:Icon }) => (
-        <button
-          key={id}
-          onClick={() => onNavigate(id)}
-          className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs transition-colors ${
-            activeId === id
-              ? "text-slate-900 font-semibold"
-              : "text-slate-400"
-          }`}
-        >
-          <Icon size={20} strokeWidth={activeId===id ? 2.5 : 1.8}/>
-          <span className="text-[10px] leading-none">{label}</span>
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-100 flex md:hidden safe-area-bottom">
+      {items.map(({id,label,icon:Icon})=>(
+        <button key={id} onClick={()=>onNavigate(id)}
+          className={`flex-1 flex flex-col items-center gap-0.5 pt-2 pb-3 transition-colors ${activeId===id?"text-slate-900":"text-slate-400"}`}>
+          <Icon size={21} strokeWidth={activeId===id?2.5:1.8}/>
+          <span className="text-[10px] leading-none font-medium">{label}</span>
         </button>
       ))}
     </nav>
@@ -120,22 +113,15 @@ function BottomNav({ currentView, onNavigate }) {
 
 function ProfessorModal({ prof, onClose, canTransfer }) {
   if (!prof) return null;
-  const nomeacoes = prof.nomeacoes ?? [];
+  const nomeacoes = prof.nomeacoes??[];
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/25 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      {/* Sheet no mobile, modal no desktop */}
-      <div
-        className="bg-white w-full rounded-t-3xl sm:rounded-3xl shadow-2xl sm:max-w-md overflow-hidden"
-        onClick={e=>e.stopPropagation()}
-      >
-        {/* Drag handle mobile */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/25 backdrop-blur-sm"
+      onClick={onClose}>
+      <div className="bg-white w-full md:max-w-md md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden"
+        onClick={e=>e.stopPropagation()}>
+        <div className="flex justify-center pt-3 pb-1 md:hidden">
           <div className="w-10 h-1 rounded-full bg-slate-200"/>
         </div>
-
         <div className="relative bg-slate-950 px-6 py-5">
           <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
             <X size={16} className="text-white"/>
@@ -145,13 +131,13 @@ function ProfessorModal({ prof, onClose, canTransfer }) {
               {initials(prof.nome)}
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-semibold text-white leading-snug">{prof.nome}</h2>
+              <h2 className="text-base font-semibold text-white leading-snug">{prof.nome}</h2>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${prof.status==="Ativo"?"bg-emerald-500/20 text-emerald-300":"bg-amber-500/20 text-amber-300"}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${prof.status==="Ativo"?"bg-emerald-400":"bg-amber-400"}`}/>
                   {prof.status}
                 </span>
-                {nomeacoes.length > 1 && (
+                {nomeacoes.length>1&&(
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
                     <Briefcase size={10}/>{nomeacoes.length} nomeações
                   </span>
@@ -160,47 +146,42 @@ function ProfessorModal({ prof, onClose, canTransfer }) {
             </div>
           </div>
         </div>
-
         <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
           <div>
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Unidades / Nomeações</p>
             <div className="space-y-2">
-              {nomeacoes.length === 0 && <p className="text-sm text-slate-400 italic">Nenhuma nomeação registrada</p>}
-              {nomeacoes.map((n,i) => {
-                const escola = n.escola ?? {};
+              {nomeacoes.length===0&&<p className="text-sm text-slate-400 italic">Nenhuma nomeação registrada</p>}
+              {nomeacoes.map((n,i)=>{
+                const escola=n.escola??{};
                 return (
                   <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
                     <School size={15} className="text-slate-400 mt-0.5 shrink-0"/>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 leading-snug">{escola.name ?? "—"}</p>
-                      {n.matricula && <p className="text-xs font-mono text-slate-400 mt-0.5">{n.matricula}</p>}
-                      {n.cargo && <p className="text-xs text-slate-500">{n.cargo}</p>}
-                      {n.observacoes && (
-                        <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
-                          <AlertCircle size={11}/>{n.observacoes}
-                        </p>
-                      )}
+                      <p className="text-sm font-medium text-slate-800 leading-snug">{escola.name??"—"}</p>
+                      {n.matricula&&<p className="text-xs font-mono text-slate-400 mt-0.5">{n.matricula}</p>}
+                      {n.cargo&&<p className="text-xs text-slate-500">{n.cargo}</p>}
+                      {n.observacoes&&<p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1"><AlertCircle size={11}/>{n.observacoes}</p>}
                     </div>
-                    {escola.tipo && <Badge className={TIPO_COLORS[escola.tipo]}>{escola.tipo}</Badge>}
+                    {escola.tipo&&<Badge className={TIPO_COLORS[escola.tipo]}>{escola.tipo}</Badge>}
                   </div>
                 );
               })}
             </div>
           </div>
-          {(prof.regencia_h || prof.htp_h || prof.hti_h) && (
+          {(prof.regencia_h||prof.htp_h||prof.hti_h)&&(
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Carga Horária</p>
               <div className="grid grid-cols-3 gap-2">
-                {[["Regência",prof.regencia_h],["HTP",prof.htp_h],["HTI",prof.hti_h]].map(([l,v]) => (
+                {[["Regência",prof.regencia_h],["HTP",prof.htp_h],["HTI",prof.hti_h]].map(([l,v])=>(
                   <div key={l} className="bg-slate-50 rounded-2xl p-3 text-center">
-                    <p className="text-xl font-semibold text-slate-700">{v ?? "—"}h</p>
+                    <p className="text-xl font-semibold text-slate-700">{v??"—"}h</p>
                     <p className="text-xs text-slate-400 mt-0.5">{l}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          {prof.formacao && (
+          {prof.formacao&&(
             <div className="flex items-start gap-3 p-3 bg-violet-50 rounded-2xl">
               <GraduationCap size={16} className="text-violet-500 mt-0.5 shrink-0"/>
               <div>
@@ -209,9 +190,8 @@ function ProfessorModal({ prof, onClose, canTransfer }) {
               </div>
             </div>
           )}
-          {/* Botões — touch-friendly */}
           <div className="flex gap-2 pt-1 pb-2">
-            {canTransfer && (
+            {canTransfer&&(
               <button className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 active:scale-95 transition-all">
                 <ArrowRightLeft size={14}/> Transferir
               </button>
@@ -229,57 +209,50 @@ function ProfessorModal({ prof, onClose, canTransfer }) {
 // ─── SERVIDOR MODAL ───────────────────────────────────────────────────────────
 
 function ServidorModal({ servidorId, onClose, canTransfer }) {
-  const { servidor, loading, error } = useServidorDetalhes(servidorId);
+  const {servidor,loading,error} = useServidorDetalhes(servidorId);
   if (!servidorId) return null;
   const escolas = servidor?.escola_raw
     ? servidor.escola_raw.split(",").map(e=>e.trim()).filter(Boolean)
     : [];
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/25 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full rounded-t-3xl sm:rounded-3xl shadow-2xl sm:max-w-md overflow-hidden"
-        onClick={e=>e.stopPropagation()}
-      >
-        {/* Drag handle mobile */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/25 backdrop-blur-sm"
+      onClick={onClose}>
+      <div className="bg-white w-full md:max-w-md md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden"
+        onClick={e=>e.stopPropagation()}>
+        <div className="flex justify-center pt-3 pb-1 md:hidden">
           <div className="w-10 h-1 rounded-full bg-slate-200"/>
         </div>
-
         <div className="relative bg-slate-950 px-6 py-5">
           <button onClick={onClose} className="absolute top-4 right-4 p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
             <X size={16} className="text-white"/>
           </button>
-          {loading ? (
+          {loading?(
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center">
                 <Loader2 size={20} className="animate-spin text-white/50"/>
               </div>
               <p className="text-white/50 text-sm">Carregando…</p>
             </div>
-          ) : error ? (
+          ):error?(
             <p className="text-red-300 text-sm">Erro ao carregar dados.</p>
-          ) : servidor ? (
+          ):servidor?(
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white">
                 {initials(servidor.nome)}
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-semibold text-white leading-snug">{servidor.nome}</h2>
+                <h2 className="text-base font-semibold text-white leading-snug">{servidor.nome}</h2>
                 <p className="text-white/50 text-xs mt-1">Servidor Municipal</p>
               </div>
             </div>
-          ) : null}
+          ):null}
         </div>
-
-        {!loading && !error && servidor && (
+        {!loading&&!error&&servidor&&(
           <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Dados Pessoais</p>
               <div className="space-y-2">
-                {servidor.data_nascimento && (
+                {servidor.data_nascimento&&(
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
                     <Calendar size={15} className="text-slate-400 shrink-0"/>
                     <div>
@@ -290,29 +263,29 @@ function ServidorModal({ servidorId, onClose, canTransfer }) {
                     </div>
                   </div>
                 )}
-                {servidor.telefone && (
+                {servidor.telefone&&(
                   <a href={`tel:${servidor.telefone.replace(/\D/g,"")}`}
-                     className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
+                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
                     <Phone size={15} className="text-slate-400 shrink-0"/>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-xs text-slate-400">Telefone</p>
                       <p className="text-sm font-medium text-slate-700">{servidor.telefone}</p>
                     </div>
-                    <ChevronRight size={14} className="text-slate-300 ml-auto"/>
+                    <ChevronRight size={14} className="text-slate-300"/>
                   </a>
                 )}
-                {servidor.email && (
+                {servidor.email&&(
                   <a href={`mailto:${servidor.email}`}
-                     className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
+                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors">
                     <Hash size={15} className="text-slate-400 shrink-0"/>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-slate-400">E-mail</p>
                       <p className="text-sm font-medium text-slate-700 truncate">{servidor.email}</p>
                     </div>
-                    <ChevronRight size={14} className="text-slate-300 ml-auto shrink-0"/>
+                    <ChevronRight size={14} className="text-slate-300 shrink-0"/>
                   </a>
                 )}
-                {servidor.endereco && (
+                {servidor.endereco&&(
                   <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl">
                     <MapPin size={15} className="text-slate-400 shrink-0 mt-0.5"/>
                     <div>
@@ -323,13 +296,13 @@ function ServidorModal({ servidorId, onClose, canTransfer }) {
                 )}
               </div>
             </div>
-            {escolas.length > 0 && (
+            {escolas.length>0&&(
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  {escolas.length > 1 ? "Escolas" : "Escola"}
+                  {escolas.length>1?"Escolas":"Escola"}
                 </p>
                 <div className="space-y-2">
-                  {escolas.map((e,i) => (
+                  {escolas.map((e,i)=>(
                     <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
                       <School size={15} className="text-slate-400 shrink-0"/>
                       <p className="text-sm font-medium text-slate-700">{e}</p>
@@ -338,11 +311,11 @@ function ServidorModal({ servidorId, onClose, canTransfer }) {
                 </div>
               </div>
             )}
-            {!servidor.data_nascimento && !servidor.telefone && !servidor.email && !servidor.endereco && (
+            {!servidor.data_nascimento&&!servidor.telefone&&!servidor.email&&!servidor.endereco&&(
               <p className="text-sm text-slate-400 italic text-center py-4">Nenhum dado adicional registrado.</p>
             )}
             <div className="flex gap-2 pt-1 pb-2">
-              {canTransfer && (
+              {canTransfer&&(
                 <button className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 active:scale-95 transition-all">
                   <ArrowRightLeft size={14}/> Transferir
                 </button>
@@ -361,91 +334,70 @@ function ServidorModal({ servidorId, onClose, canTransfer }) {
 // ─── SEARCH OVERLAY ──────────────────────────────────────────────────────────
 
 function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState({ profs:[], escolas:[], servidores:[] });
-  const [searching, setSearching] = useState(false);
+  const [query,setQuery] = useState("");
+  const [results,setResults] = useState({profs:[],escolas:[],servidores:[]});
+  const [searching,setSearching] = useState(false);
 
-  useEffect(() => {
-    const h = e => { if (e.key==="Escape") onClose(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [onClose]);
+  useEffect(()=>{
+    const h=e=>{if(e.key==="Escape")onClose();};
+    window.addEventListener("keydown",h);
+    return()=>window.removeEventListener("keydown",h);
+  },[onClose]);
 
-  useEffect(() => {
-    if (query.length < 2) { setResults({ profs:[], escolas:[], servidores:[] }); return; }
+  useEffect(()=>{
+    if(query.length<2){setResults({profs:[],escolas:[],servidores:[]});return;}
     setSearching(true);
-    const t = setTimeout(async () => {
-      try {
-        const r = await buscarGlobal(query);
-        setResults(r ?? { profs:[], escolas:[], servidores:[] });
-      } catch(_) {
-        setResults({ profs:[], escolas:[], servidores:[] });
-      } finally { setSearching(false); }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [query]);
+    const t=setTimeout(async()=>{
+      try{const r=await buscarGlobal(query);setResults(r??{profs:[],escolas:[],servidores:[]});}
+      catch(_){setResults({profs:[],escolas:[],servidores:[]});}
+      finally{setSearching(false);}
+    },300);
+    return()=>clearTimeout(t);
+  },[query]);
 
-  const total = (results.profs?.length??0)+(results.escolas?.length??0)+(results.servidores?.length??0);
+  const total=(results.profs?.length??0)+(results.escolas?.length??0)+(results.servidores?.length??0);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-start sm:justify-center sm:pt-20 p-0 sm:p-4 bg-black/30 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full rounded-t-3xl sm:rounded-2xl shadow-2xl sm:max-w-xl overflow-hidden"
-        onClick={e=>e.stopPropagation()}
-      >
-        {/* Drag handle mobile */}
-        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+    <div className="fixed inset-0 z-50 flex items-end md:items-start md:justify-center md:pt-20 bg-black/30 backdrop-blur-sm"
+      onClick={onClose}>
+      <div className="bg-white w-full md:max-w-xl md:mx-4 rounded-t-3xl md:rounded-2xl shadow-2xl overflow-hidden"
+        onClick={e=>e.stopPropagation()}>
+        <div className="flex justify-center pt-3 pb-1 md:hidden">
           <div className="w-10 h-1 rounded-full bg-slate-200"/>
         </div>
-
-        {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
           {searching
-            ? <Loader2 size={16} className="animate-spin text-slate-400 shrink-0"/>
-            : <Search size={16} className="text-slate-400 shrink-0"/>
+            ?<Loader2 size={16} className="animate-spin text-slate-400 shrink-0"/>
+            :<Search size={16} className="text-slate-400 shrink-0"/>
           }
-          <input
-            autoFocus
+          <input autoFocus
             className="flex-1 text-base outline-none placeholder:text-slate-300 bg-transparent"
             placeholder="Nome do servidor ou escola..."
-            value={query}
-            onChange={e=>setQuery(e.target.value)}
-          />
+            value={query} onChange={e=>setQuery(e.target.value)}/>
           {query
-            ? <button onClick={()=>setQuery("")} className="p-1 rounded-lg hover:bg-slate-100 transition-colors">
-                <X size={16} className="text-slate-400"/>
-              </button>
-            : <button onClick={onClose} className="text-xs text-slate-400 px-2 py-1 hover:bg-slate-100 rounded-lg">
-                Fechar
-              </button>
+            ?<button onClick={()=>setQuery("")} className="p-1 rounded-lg hover:bg-slate-100"><X size={16} className="text-slate-400"/></button>
+            :<button onClick={onClose} className="text-xs text-slate-400 px-2 py-1 hover:bg-slate-100 rounded-lg">Fechar</button>
           }
         </div>
-
-        {/* Dica multi-palavra */}
-        {query.length >= 2 && !searching && total === 0 && (
-          <div className="px-4 py-3 text-center">
-            <p className="text-sm text-slate-400">Nenhum resultado para "{query}"</p>
-            <p className="text-xs text-slate-300 mt-1">Tente partes do nome: "Ana" ou "Velho"</p>
-          </div>
-        )}
-        {query.length < 2 && (
-          <div className="px-4 py-6 text-center">
-            <p className="text-sm text-slate-400">Digite ao menos 2 letras</p>
-            <p className="text-xs text-slate-300 mt-1">Pode usar partes do nome: "Ana Velho" encontra "Ana Tshiedel Velho"</p>
-          </div>
-        )}
-
-        <div className="max-h-[55vh] overflow-y-auto pb-safe">
-          {/* Escolas */}
-          {(results.escolas??[]).length > 0 && (
+        <div className="max-h-[55vh] overflow-y-auto">
+          {query.length>=2&&!searching&&total===0&&(
+            <div className="px-4 py-6 text-center">
+              <p className="text-sm text-slate-400">Nenhum resultado para "{query}"</p>
+              <p className="text-xs text-slate-300 mt-1">Tente partes do nome separadas por espaço</p>
+            </div>
+          )}
+          {query.length<2&&(
+            <div className="px-4 py-6 text-center">
+              <p className="text-sm text-slate-400">Digite ao menos 2 letras</p>
+              <p className="text-xs text-slate-300 mt-1">"Ana Velho" encontra "Ana Tshiedel Velho"</p>
+            </div>
+          )}
+          {(results.escolas??[]).length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Escolas</p>
-              {(results.escolas??[]).map(s => (
-                <button key={s.id} onClick={()=>{ onSelectSchool(s); onClose(); }}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors text-left">
+              {results.escolas.map(s=>(
+                <button key={s.id} onClick={()=>{onSelectSchool(s);onClose();}}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 active:bg-slate-100 text-left transition-colors">
                   <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
                     <School size={15} className="text-slate-500"/>
                   </div>
@@ -458,13 +410,11 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) 
               ))}
             </div>
           )}
-
-          {/* Professores */}
-          {(results.profs??[]).length > 0 && (
+          {(results.profs??[]).length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Professores</p>
-              {(results.profs??[]).map(p => {
-                const esc = (p.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean);
+              {results.profs.map(p=>{
+                const esc=(p.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean);
                 return (
                   <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
                     <AvatarCircle name={p.nome} size="sm"/>
@@ -472,10 +422,8 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) 
                       <p className="text-sm font-medium text-slate-700">{p.nome}</p>
                       <p className="text-xs text-slate-400 truncate">{esc.join(" · ")||"—"}</p>
                     </div>
-                    <button
-                      onClick={()=>{ onOpenProf(p); onClose(); }}
-                      className="flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-600 rounded-xl text-xs font-medium transition-colors shrink-0 active:scale-95"
-                    >
+                    <button onClick={()=>{onOpenProf(p);onClose();}}
+                      className="flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-600 rounded-xl text-xs font-medium transition-colors shrink-0 active:scale-95">
                       <Info size={12}/> Dados
                     </button>
                   </div>
@@ -483,24 +431,20 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) 
               })}
             </div>
           )}
-
-          {/* Servidores unificados */}
-          {(results.servidores??[]).length > 0 && (
+          {(results.servidores??[]).length>0&&(
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Dados Cadastrais</p>
-              {(results.servidores??[]).map(s => {
-                const escAtual = s.escola_raw ? s.escola_raw.split(",")[0].trim() : null;
+              {results.servidores.map(s=>{
+                const escAtual=s.escola_raw?s.escola_raw.split(",")[0].trim():null;
                 return (
                   <div key={s.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
                     <AvatarCircle name={s.nome} size="sm"/>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700">{s.nome}</p>
-                      {escAtual && <p className="text-xs text-slate-400 truncate">{escAtual}</p>}
+                      {escAtual&&<p className="text-xs text-slate-400 truncate">{escAtual}</p>}
                     </div>
-                    <button
-                      onClick={()=>{ onOpenServidor(s.id); onClose(); }}
-                      className="flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-600 rounded-xl text-xs font-medium transition-colors shrink-0 active:scale-95"
-                    >
+                    <button onClick={()=>{onOpenServidor(s.id);onClose();}}
+                      className="flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-600 rounded-xl text-xs font-medium transition-colors shrink-0 active:scale-95">
                       <Info size={12}/> Dados
                     </button>
                   </div>
@@ -517,25 +461,25 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenProf, onOpenServidor }) 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 
 function Dashboard({ onSelectSchool }) {
-  const { stats, loading } = useDashboardStats();
-  const { escolas } = useEscolas();
-  if (loading) return <Spinner/>;
+  const {stats,loading}=useDashboardStats();
+  const {escolas}=useEscolas();
+  if(loading)return<Spinner/>;
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900">Visão Geral</h1>
+        <h1 className="text-xl font-semibold text-slate-900">Visão Geral</h1>
         <p className="text-sm text-slate-500 mt-1">Rede Municipal · Vacaria–RS · {mesAnoLabel(mesAnoAtual())}</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         {[
-          { label:"Escolas",         val:stats?.totalEscolas,    icon:School,        bg:"bg-slate-50",  text:"text-slate-800",  ib:"bg-slate-200 text-slate-600" },
-          { label:"Professores",     val:stats?.totalProfs,      icon:GraduationCap, bg:"bg-blue-50",   text:"text-blue-800",   ib:"bg-blue-200 text-blue-700" },
-          { label:"Cadastrais",      val:stats?.totalServidores, icon:UserCog,       bg:"bg-violet-50", text:"text-violet-800", ib:"bg-violet-200 text-violet-700" },
-          { label:"Duplas Nome.",    val:stats?.duplos,          icon:ArrowRightLeft,bg:"bg-amber-50",  text:"text-amber-800",  ib:"bg-amber-200 text-amber-700" },
-        ].map(({ label, val, icon:Icon, bg, text, ib }) => (
+          {label:"Escolas",    val:stats?.totalEscolas,    icon:School,        bg:"bg-slate-50",  text:"text-slate-800",  ib:"bg-slate-200 text-slate-600"},
+          {label:"Professores",val:stats?.totalProfs,      icon:GraduationCap, bg:"bg-blue-50",   text:"text-blue-800",   ib:"bg-blue-200 text-blue-700"},
+          {label:"Cadastrais", val:stats?.totalServidores, icon:UserCog,       bg:"bg-violet-50", text:"text-violet-800", ib:"bg-violet-200 text-violet-700"},
+          {label:"Duplas",     val:stats?.duplos,          icon:ArrowRightLeft,bg:"bg-amber-50",  text:"text-amber-800",  ib:"bg-amber-200 text-amber-700"},
+        ].map(({label,val,icon:Icon,bg,text,ib})=>(
           <div key={label} className={`${bg} rounded-2xl p-4`}>
             <div className={`w-8 h-8 rounded-xl ${ib} flex items-center justify-center mb-2`}><Icon size={15}/></div>
-            <p className={`text-2xl sm:text-3xl font-semibold ${text}`}>{val ?? "—"}</p>
+            <p className={`text-2xl font-semibold ${text}`}>{val??"—"}</p>
             <p className="text-xs text-slate-500 mt-0.5">{label}</p>
           </div>
         ))}
@@ -543,8 +487,8 @@ function Dashboard({ onSelectSchool }) {
       <div>
         <h2 className="text-sm font-semibold text-slate-700 mb-3">Por modalidade</h2>
         <div className="grid grid-cols-3 gap-2">
-          {["EMEF","EMEI","EMEF Campo"].map(tipo => {
-            const count = escolas.filter(e=>e.tipo===tipo).length;
+          {["EMEF","EMEI","EMEF Campo"].map(tipo=>{
+            const count=escolas.filter(e=>e.tipo===tipo).length;
             return (
               <div key={tipo} className="p-3 bg-white border border-slate-100 rounded-2xl">
                 <Badge className={`${TIPO_COLORS[tipo]} mb-2`}>{tipo}</Badge>
@@ -558,7 +502,7 @@ function Dashboard({ onSelectSchool }) {
       <div>
         <h2 className="text-sm font-semibold text-slate-700 mb-3">Todas as unidades</h2>
         <div className="grid sm:grid-cols-2 gap-2">
-          {escolas.map(escola => (
+          {escolas.map(escola=>(
             <div key={escola.id} onClick={()=>onSelectSchool(escola)}
               className="group flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl hover:border-slate-200 active:bg-slate-50 cursor-pointer transition-all">
               <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center group-hover:bg-slate-900 transition-colors shrink-0">
@@ -578,14 +522,14 @@ function Dashboard({ onSelectSchool }) {
 // ─── SCHOOLS GRID ────────────────────────────────────────────────────────────
 
 function SchoolsGrid({ onSelectSchool }) {
-  const { escolas, loading } = useEscolas();
-  const [tipoFiltro, setTipoFiltro] = useState("Todos");
-  const [search, setSearch] = useState("");
-  const filtered = useMemo(
+  const {escolas,loading}=useEscolas();
+  const [tipoFiltro,setTipoFiltro]=useState("Todos");
+  const [search,setSearch]=useState("");
+  const filtered=useMemo(
     ()=>escolas.filter(s=>(tipoFiltro==="Todos"||s.tipo===tipoFiltro)&&(search===""||s.name.toLowerCase().includes(search.toLowerCase()))),
     [escolas,tipoFiltro,search]
   );
-  if (loading) return <Spinner/>;
+  if(loading)return<Spinner/>;
   return (
     <div className="space-y-5">
       <div>
@@ -599,7 +543,7 @@ function SchoolsGrid({ onSelectSchool }) {
             placeholder="Filtrar escolas..." value={search} onChange={e=>setSearch(e.target.value)}/>
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {["Todos","EMEF","EMEI","EMEF Campo"].map(t => (
+          {["Todos","EMEF","EMEI","EMEF Campo"].map(t=>(
             <button key={t} onClick={()=>setTipoFiltro(t)}
               className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${tipoFiltro===t?"bg-slate-900 text-white":"bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
               {t}
@@ -608,7 +552,7 @@ function SchoolsGrid({ onSelectSchool }) {
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map(escola => (
+        {filtered.map(escola=>(
           <div key={escola.id} onClick={()=>onSelectSchool(escola)}
             className="group p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 active:bg-slate-50 hover:shadow-md cursor-pointer transition-all">
             <div className="flex items-start justify-between mb-3">
@@ -632,10 +576,10 @@ function SchoolsGrid({ onSelectSchool }) {
 // ─── SCHOOL QUADRO ───────────────────────────────────────────────────────────
 
 function SchoolQuadro({ escola, onBack, onOpenProf }) {
-  const { professores, loading } = useProfessoresByEscola(escola.id);
-  const { efe, salvarEfe, saving } = useEfetividade(escola.id, mesAnoAtual());
-  const [search, setSearch] = useState("");
-  const filtered = useMemo(
+  const {professores,loading}=useProfessoresByEscola(escola.id);
+  const {efe,salvarEfe,saving}=useEfetividade(escola.id,mesAnoAtual());
+  const [search,setSearch]=useState("");
+  const filtered=useMemo(
     ()=>professores.filter(p=>search===""||p.nome.toLowerCase().includes(search.toLowerCase())),
     [professores,search]
   );
@@ -647,10 +591,10 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-base sm:text-xl font-semibold text-slate-900 leading-tight">{escola.name}</h1>
+            <h1 className="text-base font-semibold text-slate-900 leading-tight">{escola.name}</h1>
             <Badge className={TIPO_COLORS[escola.tipo]}>{escola.tipo}</Badge>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             {loading?"…":`${professores.length} professores`} · {mesAnoLabel(mesAnoAtual())}
           </p>
         </div>
@@ -659,39 +603,38 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
         <Search size={15} className="text-slate-400"/>
         <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
           placeholder="Buscar professor..." value={search} onChange={e=>setSearch(e.target.value)}/>
-        {search && <button onClick={()=>setSearch("")}><X size={14} className="text-slate-400"/></button>}
+        {search&&<button onClick={()=>setSearch("")}><X size={14} className="text-slate-400"/></button>}
       </div>
-      {loading ? <Spinner/> : (
+      {loading?<Spinner/>:(
         <div className="space-y-2">
-          {filtered.length===0 && (
+          {filtered.length===0&&(
             <div className="text-center py-16 text-slate-400">
               <Users size={32} className="mx-auto mb-2 opacity-30"/>
               <p className="text-sm">Nenhum professor encontrado</p>
             </div>
           )}
-          {filtered.map(prof => {
-            const outra = (prof.nomeacoes??[]).find(n=>n.escola?.id!==escola.id);
-            const efeProf = efe[prof.id];
+          {filtered.map(prof=>{
+            const outra=(prof.nomeacoes??[]).find(n=>n.escola?.id!==escola.id);
+            const efeProf=efe[prof.id];
             return (
-              <div key={prof.id} className="flex items-center gap-3 p-3 sm:p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
+              <div key={prof.id} className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
                 <div className="cursor-pointer shrink-0" onClick={()=>onOpenProf(prof)}>
                   <AvatarCircle name={prof.nome}/>
                 </div>
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>onOpenProf(prof)}>
                   <p className="text-sm font-semibold text-slate-800 leading-snug">{prof.nome}</p>
-                  {outra && <p className="text-xs text-slate-400 truncate">+ {outra.escola?.name}</p>}
+                  {outra&&<p className="text-xs text-slate-400 truncate">+ {outra.escola?.name}</p>}
                 </div>
-                {/* EFE compacto no mobile */}
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={()=>salvarEfe(prof.id,"ok",null)}
-                    className={`p-2 rounded-xl text-xs font-medium transition-all ${efeProf?.status==="ok"?"bg-emerald-500 text-white":"bg-slate-100 text-slate-500"}`}>
+                    className={`p-2 rounded-xl transition-all ${efeProf?.status==="ok"?"bg-emerald-500 text-white":"bg-slate-100 text-slate-500"}`}>
                     <CheckCircle2 size={15}/>
                   </button>
                   <button onClick={()=>salvarEfe(prof.id,"ocorrencia","Falta")}
-                    className={`p-2 rounded-xl text-xs font-medium transition-all ${efeProf?.status==="ocorrencia"?"bg-amber-400 text-white":"bg-slate-100 text-slate-500"}`}>
+                    className={`p-2 rounded-xl transition-all ${efeProf?.status==="ocorrencia"?"bg-amber-400 text-white":"bg-slate-100 text-slate-500"}`}>
                     <AlertCircle size={15}/>
                   </button>
-                  {saving && <Loader2 size={13} className="animate-spin text-slate-400"/>}
+                  {saving&&<Loader2 size={13} className="animate-spin text-slate-400"/>}
                 </div>
               </div>
             );
@@ -705,18 +648,18 @@ function SchoolQuadro({ escola, onBack, onOpenProf }) {
 // ─── PROFESSORES LIST ────────────────────────────────────────────────────────
 
 function ProfessoresList({ onOpenProf }) {
-  const { professores, loading, reload } = useProfessores();
-  const { escolas } = useEscolas();
-  const [search, setSearch] = useState("");
-  const [escolaFiltro, setEscolaFiltro] = useState("Todas");
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return professores.filter(p =>
-      (search===""||p.nome.toLowerCase().includes(q)) &&
+  const {professores,loading,reload}=useProfessores();
+  const {escolas}=useEscolas();
+  const [search,setSearch]=useState("");
+  const [escolaFiltro,setEscolaFiltro]=useState("Todas");
+  const filtered=useMemo(()=>{
+    const q=search.toLowerCase();
+    return professores.filter(p=>
+      (search===""||p.nome.toLowerCase().includes(q))&&
       (escolaFiltro==="Todas"||(p.nomeacoes??[]).some(n=>n.escola?.name===escolaFiltro))
     );
-  }, [professores, search, escolaFiltro]);
-  if (loading) return <Spinner/>;
+  },[professores,search,escolaFiltro]);
+  if(loading)return<Spinner/>;
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -733,7 +676,7 @@ function ProfessoresList({ onOpenProf }) {
           <Search size={15} className="text-slate-400"/>
           <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
             placeholder="Buscar professor..." value={search} onChange={e=>setSearch(e.target.value)}/>
-          {search && <button onClick={()=>setSearch("")}><X size={14} className="text-slate-400"/></button>}
+          {search&&<button onClick={()=>setSearch("")}><X size={14} className="text-slate-400"/></button>}
         </div>
         <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)}
           className="w-full px-3 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
@@ -743,11 +686,11 @@ function ProfessoresList({ onOpenProf }) {
       </div>
       <p className="text-xs text-slate-400">{filtered.length} encontrado{filtered.length!==1?"s":""}</p>
       <div className="space-y-2">
-        {filtered.map(prof => {
+        {filtered.map(prof=>{
           const esc=[...new Set((prof.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean))];
           return (
             <div key={prof.id} onClick={()=>onOpenProf(prof)}
-              className="flex items-center gap-3 p-3 sm:p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 active:bg-slate-50 cursor-pointer transition-all">
+              className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 active:bg-slate-50 cursor-pointer transition-all">
               <AvatarCircle name={prof.nome}/>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -769,28 +712,26 @@ function ProfessoresList({ onOpenProf }) {
 // ─── DADOS CADASTRAIS ─────────────────────────────────────────────────────────
 
 function DadosCadastrais({ onOpenServidor }) {
-  const { servidores, loading, reload } = useServidores();
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(()=>setDebouncedSearch(search), 300);
-    return ()=>clearTimeout(t);
-  }, [search]);
-  const filtered = useMemo(() => {
-    const q = debouncedSearch.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
-    const base = Array.isArray(servidores) ? servidores : [];
-    if (!q) return base;
+  const {servidores,loading,reload}=useServidores();
+  const [search,setSearch]=useState("");
+  const [debouncedSearch,setDebouncedSearch]=useState("");
+  useEffect(()=>{
+    const t=setTimeout(()=>setDebouncedSearch(search),300);
+    return()=>clearTimeout(t);
+  },[search]);
+  const filtered=useMemo(()=>{
+    const q=debouncedSearch.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+    const base=Array.isArray(servidores)?servidores:[];
+    if(!q)return base;
     return base.filter(s=>(s.nome_normalizado||s.nome||"").toUpperCase().includes(q));
-  }, [servidores, debouncedSearch]);
-  if (loading) return <Spinner/>;
+  },[servidores,debouncedSearch]);
+  if(loading)return<Spinner/>;
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Dados Cadastrais</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {Array.isArray(servidores)?servidores.length:0} servidores
-          </p>
+          <p className="text-sm text-slate-500 mt-0.5">{Array.isArray(servidores)?servidores.length:0} servidores</p>
         </div>
         <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors">
           <RefreshCw size={16} className="text-slate-500"/>
@@ -800,7 +741,7 @@ function DadosCadastrais({ onOpenServidor }) {
         <Search size={15} className="text-slate-400"/>
         <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
           placeholder="Buscar pelo nome..." value={search} onChange={e=>setSearch(e.target.value)}/>
-        {search && <button onClick={()=>setSearch("")}><X size={14} className="text-slate-400"/></button>}
+        {search&&<button onClick={()=>setSearch("")}><X size={14} className="text-slate-400"/></button>}
       </div>
       <p className="text-xs text-slate-400">
         {filtered.length} resultado{filtered.length!==1?"s":""}
@@ -814,11 +755,12 @@ function DadosCadastrais({ onOpenServidor }) {
         </div>
       )}
       <div className="space-y-2">
-        {filtered.map(s => {
-          const escAtual = s.escola_raw ? s.escola_raw.split(",")[0].trim() : null;
-          const temDados = s.telefone||s.email||s.endereco||s.data_nascimento;
+        {filtered.map(s=>{
+          const escAtual=s.escola_raw?s.escola_raw.split(",")[0].trim():null;
+          const temDados=s.telefone||s.email||s.endereco||s.data_nascimento;
           return (
-            <div key={s.id} className="flex items-center gap-3 p-3 sm:p-4 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
+            <div key={s.id}
+              className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
               <AvatarCircle name={s.nome}/>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-slate-800">{s.nome}</p>
@@ -840,20 +782,20 @@ function DadosCadastrais({ onOpenServidor }) {
 // ─── EFE MODULE ──────────────────────────────────────────────────────────────
 
 function EfeModule({ onOpenProf }) {
-  const { professores, loading } = useProfessores();
-  const { escolas } = useEscolas();
-  const [escolaFiltro, setEscolaFiltro] = useState("");
-  const [search, setSearch] = useState("");
-  const escolaSel = useMemo(()=>escolas.find(e=>e.name===escolaFiltro),[escolas,escolaFiltro]);
-  const { efe, salvarEfe, saving } = useEfetividade(escolaSel?.id, mesAnoAtual());
-  const filtered = useMemo(()=>{
+  const {professores,loading}=useProfessores();
+  const {escolas}=useEscolas();
+  const [escolaFiltro,setEscolaFiltro]=useState("");
+  const [search,setSearch]=useState("");
+  const escolaSel=useMemo(()=>escolas.find(e=>e.name===escolaFiltro),[escolas,escolaFiltro]);
+  const {efe,salvarEfe,saving}=useEfetividade(escolaSel?.id,mesAnoAtual());
+  const filtered=useMemo(()=>{
     const q=search.toLowerCase();
     return professores.filter(p=>
       (search===""||p.nome.toLowerCase().includes(q))&&
       (escolaFiltro===""||( p.nomeacoes??[]).some(n=>n.escola?.name===escolaFiltro))
     ).slice(0,100);
   },[professores,search,escolaFiltro]);
-  if (loading) return <Spinner/>;
+  if(loading)return<Spinner/>;
   return (
     <div className="space-y-5">
       <div>
@@ -866,7 +808,7 @@ function EfeModule({ onOpenProf }) {
           <option value="">Selecionar escola...</option>
           {escolas.map(e=><option key={e.id}>{e.name}</option>)}
         </select>
-        {escolaFiltro && (
+        {escolaFiltro&&(
           <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
             <Search size={15} className="text-slate-400"/>
             <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
@@ -881,7 +823,7 @@ function EfeModule({ onOpenProf }) {
       )}
       {escolaFiltro&&<p className="text-xs text-slate-400">{filtered.length} professores {saving&&"· salvando…"}</p>}
       <div className="space-y-2">
-        {filtered.map(prof => {
+        {filtered.map(prof=>{
           const esc=[...new Set((prof.nomeacoes??[]).map(n=>n.escola?.name).filter(Boolean))];
           const efeProf=efe[prof.id];
           return (
@@ -894,12 +836,12 @@ function EfeModule({ onOpenProf }) {
               <div className="flex items-center gap-1.5 shrink-0">
                 <button onClick={()=>escolaSel&&salvarEfe(prof.id,"ok",null)} disabled={!escolaSel}
                   className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-40 ${efeProf?.status==="ok"?"bg-emerald-500 text-white":"bg-slate-100 text-slate-500"}`}>
-                  <CheckCircle2 size={13}/><span className="hidden sm:inline">OK</span>
+                  <CheckCircle2 size={13}/><span className="hidden sm:inline ml-1">OK</span>
                 </button>
                 <select disabled={!escolaSel}
                   value={efeProf?.status==="ocorrencia"?efeProf.ocorrencia:""}
                   onChange={e=>escolaSel&&salvarEfe(prof.id,"ocorrencia",e.target.value)}
-                  className={`px-2 py-2 rounded-xl text-xs font-medium outline-none cursor-pointer disabled:opacity-40 max-w-[100px] sm:max-w-none ${efeProf?.status==="ocorrencia"?"bg-amber-400 text-white":"bg-slate-100 text-slate-500"}`}>
+                  className={`px-2 py-2 rounded-xl text-xs font-medium outline-none cursor-pointer disabled:opacity-40 max-w-24 sm:max-w-none ${efeProf?.status==="ocorrencia"?"bg-amber-400 text-white":"bg-slate-100 text-slate-500"}`}>
                   <option value="">Ocorrência</option>
                   {OCORRENCIAS.map(o=><option key={o}>{o}</option>)}
                 </select>
@@ -915,47 +857,51 @@ function EfeModule({ onOpenProf }) {
 // ─── APP SHELL ───────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { user, profile, loading, signOut } = useAuth();
-  const admin = isAdmin(profile);
-  const [view, setView] = useState("dashboard");
-  const [selectedSchool, setSelectedSchool] = useState(null);
-  const [selectedProf, setSelectedProf] = useState(null);
-  const [selectedServidorId, setSelectedServidorId] = useState(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const {user,profile,loading,signOut}=useAuth();
+  const admin=isAdmin(profile);
+  const [view,setView]=useState("dashboard");
+  const [selectedSchool,setSelectedSchool]=useState(null);
+  const [selectedProf,setSelectedProf]=useState(null);
+  const [selectedServidorId,setSelectedServidorId]=useState(null);
+  const [searchOpen,setSearchOpen]=useState(false);
+  const [sidebarOpen,setSidebarOpen]=useState(true);
 
   useEffect(()=>{
-    const h=e=>{ if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();setSearchOpen(true);} };
+    const h=e=>{if((e.metaKey||e.ctrlKey)&&e.key==="k"){e.preventDefault();setSearchOpen(true);}};
     window.addEventListener("keydown",h);
     return()=>window.removeEventListener("keydown",h);
   },[]);
 
-  if (loading) return (
+  if(loading)return(
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <Loader2 size={32} className="animate-spin text-slate-400"/>
     </div>
   );
-  if (!user) return <LoginPage/>;
+  if(!user)return<LoginPage/>;
 
-  function handleSelectSchool(escola){ setSelectedSchool(escola); setView("school-detail"); }
-  function navigate(id){ setView(id); setSelectedSchool(null); }
+  function handleSelectSchool(escola){setSelectedSchool(escola);setView("school-detail");}
+  function navigate(id){setView(id);setSelectedSchool(null);}
 
-  const navItems = [
-    { id:"dashboard",   label:"Dashboard",       icon:Home },
-    { id:"schools",     label:"Unidades",         icon:School },
-    { id:"professores", label:"Professores",      icon:GraduationCap },
-    { id:"servidores",  label:"Dados Cadastrais", icon:UserCog },
-    { id:"efe",         label:"Efetividade",      icon:CheckCircle2 },
-    { id:"relatorios",  label:"Relatórios",       icon:FileText },
+  const navItems=[
+    {id:"dashboard",   label:"Dashboard",       icon:Home},
+    {id:"schools",     label:"Unidades",         icon:School},
+    {id:"professores", label:"Professores",      icon:GraduationCap},
+    {id:"servidores",  label:"Dados Cadastrais", icon:UserCog},
+    {id:"efe",         label:"Efetividade",      icon:CheckCircle2},
+    {id:"relatorios",  label:"Relatórios",       icon:FileText},
   ];
-  const currentNavId = view==="school-detail"?"schools":view;
+  const currentNavId=view==="school-detail"?"schools":view;
+
+  // Largura da sidebar: classes ESTÁTICAS para o Tailwind não purgar
+  const sideW = sidebarOpen ? "w-56" : "w-16";
+  const mainML = sidebarOpen ? "ml-56" : "ml-16";
 
   return (
-    <div className="min-h-screen bg-slate-50 flex" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
+    <div className="min-h-screen bg-slate-50" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
 
-      {/* ── Sidebar desktop (oculta no mobile) ── */}
-      <aside className={`hidden md:flex ${sidebarOpen?"w-56":"w-16"} shrink-0 bg-white border-r border-slate-100 flex-col transition-all duration-200 fixed top-0 left-0 h-screen z-30`}>
-        <div className="p-4 border-b border-slate-100 flex items-center gap-3">
+      {/* ── SIDEBAR — só desktop (md+) ── */}
+      <aside className={`${sideW} hidden md:flex flex-col bg-white border-r border-slate-100 fixed top-0 left-0 h-screen z-30 transition-all duration-200`}>
+        <div className="p-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
           <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center shrink-0">
             <GraduationCap size={15} className="text-white"/>
           </div>
@@ -966,6 +912,7 @@ export default function App() {
             </div>
           )}
         </div>
+
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map(({id,label,icon:Icon})=>(
             <button key={id} onClick={()=>navigate(id)}
@@ -975,9 +922,11 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-slate-100 space-y-1">
+
+        {/* Perfil + crédito */}
+        <div className="p-3 border-t border-slate-100 space-y-1 shrink-0">
           {sidebarOpen&&profile&&(
-            <div className="px-3 py-2 mb-1">
+            <div className="px-3 py-2">
               <p className="text-xs font-medium text-slate-700 truncate">{profile.nome||user.email}</p>
               <div className="mt-1"><RoleBadge role={profile.role}/></div>
             </div>
@@ -987,21 +936,27 @@ export default function App() {
             <LogOut size={17} className="shrink-0"/>
             {sidebarOpen&&<span>Sair</span>}
           </button>
+          {/* Crédito — só quando sidebar expandida */}
+          {sidebarOpen&&(
+            <p className="text-center text-xs text-slate-300 pt-2 pb-1">
+              Desenvolvido por Ramon Castro
+            </p>
+          )}
         </div>
       </aside>
 
-      {/* ── Main ── */}
-      <div className={`flex-1 flex flex-col min-w-0 md:${sidebarOpen?"ml-56":"ml-16"} transition-all duration-200`}>
+      {/* ── MAIN — desloca pelo mainML só em md+ ── */}
+      <div className={`flex flex-col min-h-screen ${mainML} md:transition-all md:duration-200`}>
 
         {/* Topbar */}
         <header className="h-14 bg-white border-b border-slate-100 flex items-center gap-2 px-3 sm:px-4 shrink-0 sticky top-0 z-20">
-          {/* Menu só no desktop */}
+          {/* Botão menu — só desktop */}
           <button onClick={()=>setSidebarOpen(!sidebarOpen)}
             className="hidden md:flex p-2 rounded-xl hover:bg-slate-100 transition-colors">
             <Menu size={17} className="text-slate-500"/>
           </button>
 
-          {/* Logo mobile */}
+          {/* Logo + nome — só mobile */}
           <div className="flex md:hidden items-center gap-2 shrink-0">
             <div className="w-7 h-7 rounded-lg bg-slate-950 flex items-center justify-center">
               <GraduationCap size={13} className="text-white"/>
@@ -1009,34 +964,33 @@ export default function App() {
             <span className="text-sm font-semibold text-slate-800">EduGestão</span>
           </div>
 
-          {/* Search bar */}
+          {/* Busca */}
           <button onClick={()=>setSearchOpen(true)}
-            className="flex-1 flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-400 hover:bg-slate-200 transition-colors">
-            <Search size={14}/>
-            <span className="flex-1 text-left truncate">Buscar servidor ou escola...</span>
-            <kbd className="hidden sm:inline text-xs bg-white border border-slate-200 px-1.5 py-0.5 rounded-md font-mono">⌘K</kbd>
+            className="flex-1 flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-400 hover:bg-slate-200 transition-colors min-w-0">
+            <Search size={14} className="shrink-0"/>
+            <span className="flex-1 text-left truncate text-xs sm:text-sm">Buscar servidor ou escola...</span>
+            <kbd className="hidden sm:inline text-xs bg-white border border-slate-200 px-1.5 py-0.5 rounded-md font-mono shrink-0">⌘K</kbd>
           </button>
 
-          <div className="shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center text-xs font-semibold text-white">
-              {initials(profile?.nome||user?.email||"U")}
-            </div>
+          {/* Avatar */}
+          <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center text-xs font-semibold text-white shrink-0">
+            {initials(profile?.nome||user?.email||"U")}
           </div>
         </header>
 
-        {/* Page content — padding extra no mobile para a bottom nav */}
-        <main className="flex-1 p-4 sm:p-6 max-w-5xl w-full pb-24 md:pb-6">
-          {view==="dashboard"     && <Dashboard onSelectSchool={handleSelectSchool}/>}
-          {view==="schools"       && <SchoolsGrid onSelectSchool={handleSelectSchool}/>}
-          {view==="school-detail" && selectedSchool && (
+        {/* Conteúdo — padding-bottom extra para bottom nav no mobile */}
+        <main className="flex-1 p-4 sm:p-6 pb-24 md:pb-6 max-w-5xl w-full">
+          {view==="dashboard"     &&<Dashboard onSelectSchool={handleSelectSchool}/>}
+          {view==="schools"       &&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
+          {view==="school-detail" &&selectedSchool&&(
             <SchoolQuadro escola={selectedSchool}
-              onBack={()=>{ setView("schools"); setSelectedSchool(null); }}
+              onBack={()=>{setView("schools");setSelectedSchool(null);}}
               onOpenProf={setSelectedProf}/>
           )}
-          {view==="professores"   && <ProfessoresList onOpenProf={setSelectedProf}/>}
-          {view==="servidores"    && <DadosCadastrais onOpenServidor={setSelectedServidorId}/>}
-          {view==="efe"           && <EfeModule onOpenProf={setSelectedProf}/>}
-          {view==="relatorios"    && (
+          {view==="professores"   &&<ProfessoresList onOpenProf={setSelectedProf}/>}
+          {view==="servidores"    &&<DadosCadastrais onOpenServidor={setSelectedServidorId}/>}
+          {view==="efe"           &&<EfeModule onOpenProf={setSelectedProf}/>}
+          {view==="relatorios"    &&(
             <div className="flex items-center justify-center h-64 text-slate-400">
               <div className="text-center">
                 <FileText size={32} className="mx-auto mb-2 opacity-30"/>
@@ -1047,22 +1001,20 @@ export default function App() {
         </main>
       </div>
 
-      {/* ── Bottom Nav mobile ── */}
+      {/* ── BOTTOM NAV — só mobile ── */}
       <BottomNav currentView={view} onNavigate={navigate}/>
 
-      {/* ── Overlays ── */}
-      {searchOpen && (
-        <SearchOverlay
-          onClose={()=>setSearchOpen(false)}
+      {/* ── OVERLAYS ── */}
+      {searchOpen&&(
+        <SearchOverlay onClose={()=>setSearchOpen(false)}
           onSelectSchool={handleSelectSchool}
           onOpenProf={p=>setSelectedProf(p)}
-          onOpenServidor={id=>setSelectedServidorId(id)}
-        />
+          onOpenServidor={id=>setSelectedServidorId(id)}/>
       )}
-      {selectedProf && (
+      {selectedProf&&(
         <ProfessorModal prof={selectedProf} onClose={()=>setSelectedProf(null)} canTransfer={admin}/>
       )}
-      {selectedServidorId && (
+      {selectedServidorId&&(
         <ServidorModal servidorId={selectedServidorId} onClose={()=>setSelectedServidorId(null)} canTransfer={admin}/>
       )}
 
