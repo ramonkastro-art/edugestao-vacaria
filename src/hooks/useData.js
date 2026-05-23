@@ -13,32 +13,75 @@ export function useEscolas() {
   return { escolas, loading }
 }
 
-// ─── PROFESSORES ─────────────────────────────────────────────────────────────
+// ─── SERVIDORES UNIFICADOS ────────────────────────────────────────────────────
+// Lista única: cruza professores (com nomeações) + dados cadastrais
+// Retorna array de objetos com shape:
+// { id, nome, status, nomeacoes[], cadastro: {telefone, email, endereco, ...} | null }
 
-export function useProfessores() {
-  const [professores, setProfessores] = useState([])
-  const [loading, setLoading] = useState(true)
+export function useServidoresUnificados() {
+  const [servidores, setServidores] = useState([])
+  const [loading, setLoading]       = useState(true)
+
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('professores')
-      .select(`
-        id, nome, status, email, telefone, formacao,
-        regencia_h, htp_h, hti_h,
-        nomeacoes (
-          id, matricula, cargo, tipo_vinculo, observacoes, ativa,
-          escola:escolas ( id, name, tipo )
-        )
-      `)
-      .order('nome')
-    setProfessores(data ?? [])
+
+    // Busca paralela: professores com nomeações + tabela cadastral
+    const [{ data: profs }, { data: cadastros }] = await Promise.all([
+      supabase
+        .from('professores')
+        .select(`
+          id, nome, status,
+          nomeacoes (
+            id, matricula, cargo, tipo_vinculo, observacoes, ativa,
+            escola:escolas ( id, name, tipo )
+          )
+        `)
+        .order('nome'),
+      supabase
+        .from('servidores_unificado')
+        .select('id, nome, nome_normalizado, email, telefone, endereco, data_nascimento, escola_raw'),
+    ])
+
+    // Índice de cadastros pelo nome normalizado para lookup rápido
+    const cadastroIdx = {}
+    ;(cadastros ?? []).forEach(c => {
+      const key = (c.nome_normalizado || c.nome || '').toUpperCase().trim()
+      cadastroIdx[key] = c
+    })
+
+    // Para cada professor, tenta casar com cadastro pelo nome
+    const lista = (profs ?? []).map(p => {
+      const key = p.nome.toUpperCase().trim()
+      const cadastro = cadastroIdx[key] ?? null
+      return { ...p, cadastro }
+    })
+
+    // Cadastros que NÃO têm professor correspondente (pessoal T&A puro)
+    const nomesProfs = new Set((profs ?? []).map(p => p.nome.toUpperCase().trim()))
+    ;(cadastros ?? []).forEach(c => {
+      const key = (c.nome_normalizado || c.nome || '').toUpperCase().trim()
+      if (!nomesProfs.has(key)) {
+        lista.push({
+          id: `cad_${c.id}`,   // prefixo para distinguir
+          nome: c.nome,
+          status: 'Ativo',
+          nomeacoes: [],        // sem nomeação formal no sistema
+          cadastro: c,
+        })
+      }
+    })
+
+    // Ordena tudo por nome
+    lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    setServidores(lista)
     setLoading(false)
   }, [])
+
   useEffect(() => { load() }, [load])
-  return { professores, loading, reload: load }
+  return { servidores, loading, reload: load }
 }
 
-// ─── PROFESSORES POR ESCOLA ───────────────────────────────────────────────────
+// ─── PROFESSORES POR ESCOLA (mantido para tela de quadro) ────────────────────
 
 export function useProfessoresByEscola(escolaId) {
   const [professores, setProfessores] = useState([])
@@ -67,53 +110,11 @@ export function useProfessoresByEscola(escolaId) {
             tipo_vinculo: n.tipo_vinculo, observacoes: n.observacoes,
           })
         })
-        setProfessores([...map.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+        setProfessores([...map.values()].sort((a,b) => a.nome.localeCompare(b.nome,'pt-BR')))
         setLoading(false)
       })
   }, [escolaId])
   return { professores, loading }
-}
-
-// ─── SERVIDORES UNIFICADOS ────────────────────────────────────────────────────
-
-export function useServidores() {
-  const [servidores, setServidores] = useState([])
-  const [loading, setLoading] = useState(true)
-  const load = useCallback(async () => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('servidores_unificado')
-      .select('id, nome, nome_normalizado, email, telefone, endereco, data_nascimento, escola_raw')
-      .order('nome_normalizado')
-    if (error) console.error('useServidores:', error)
-    setServidores(data ?? [])
-    setLoading(false)
-  }, [])
-  useEffect(() => { load() }, [load])
-  return { servidores, loading, reload: load }
-}
-
-// ─── DETALHES DE UM SERVIDOR ──────────────────────────────────────────────────
-
-export function useServidorDetalhes(id) {
-  const [servidor, setServidor] = useState(null)
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState(null)
-  useEffect(() => {
-    if (!id) return
-    setLoading(true); setError(null)
-    supabase
-      .from('servidores_unificado')
-      .select('id, nome, nome_normalizado, email, telefone, endereco, data_nascimento, escola_raw')
-      .eq('id', id)
-      .single()
-      .then(({ data, error: err }) => {
-        if (err) setError(err)
-        else setServidor(data)
-        setLoading(false)
-      })
-  }, [id])
-  return { servidor, loading, error }
 }
 
 // ─── EFETIVIDADE ─────────────────────────────────────────────────────────────
@@ -131,6 +132,7 @@ export function useEfetividade(escolaId, mesAno) {
         setEfe(map)
       })
   }, [escolaId, mesAno])
+
   async function salvarEfe(professorId, status, ocorrencia = null) {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -155,12 +157,12 @@ export function useDashboardStats() {
       const [
         { count: totalProfs },
         { count: totalEscolas },
-        { count: totalServidores },
+        { count: totalCadastrais },
         { data: noms },
       ] = await Promise.all([
-        supabase.from('professores').select('*', { count: 'exact', head: true }),
-        supabase.from('escolas').select('*', { count: 'exact', head: true }),
-        supabase.from('servidores_unificado').select('*', { count: 'exact', head: true }),
+        supabase.from('professores').select('*', { count:'exact', head:true }),
+        supabase.from('escolas').select('*', { count:'exact', head:true }),
+        supabase.from('servidores_unificado').select('*', { count:'exact', head:true }),
         supabase.from('nomeacoes').select('professor_id, escola_id').eq('ativa', true),
       ])
       const byProf = {}
@@ -169,9 +171,9 @@ export function useDashboardStats() {
         byProf[n.professor_id].add(n.escola_id)
       })
       setStats({
-        totalProfs: totalProfs ?? 0,
-        totalEscolas: totalEscolas ?? 0,
-        totalServidores: totalServidores ?? 0,
+        totalProfs:     totalProfs ?? 0,
+        totalEscolas:   totalEscolas ?? 0,
+        totalCadastrais: totalCadastrais ?? 0,
         totalNomeacoes: noms?.length ?? 0,
         duplos: Object.values(byProf).filter(s => s.size > 1).length,
       })
@@ -182,92 +184,89 @@ export function useDashboardStats() {
   return { stats, loading }
 }
 
-// ─── BUSCA GLOBAL — MULTI-PALAVRA ─────────────────────────────────────────────
-//
-// Estratégia: divide a query em palavras e aplica um filtro para cada uma.
-// "Ana Velho" → busca registros que contenham "Ana" E "Velho" no nome,
-// independente da ordem ou de palavras no meio.
-//
-// No Supabase PostgREST, cada .ilike() encadeia como AND automático
-// quando chamados em sequência na mesma query.
+// ─── BUSCA GLOBAL — multi-palavra, resultado unificado ────────────────────────
+// Retorna array único de servidores (sem separar professor/cadastral)
 
-function buildMultiWordFilter(query) {
-  // Remove acentos para comparação mais robusta
-  return query
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-    .toUpperCase()
-    .trim()
-    .split(/\s+/)               // divide por espaços
-    .filter(w => w.length >= 2) // ignora palavras muito curtas
+function normStr(s) {
+  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
 }
 
 export async function buscarGlobal(query) {
-  if (!query || query.length < 2) return { profs: [], escolas: [], servidores: [] }
+  if (!query || query.length < 2) return { servidores: [], escolas: [] }
 
-  const palavras = buildMultiWordFilter(query)
-  if (palavras.length === 0) return { profs: [], escolas: [], servidores: [] }
+  const palavras = normStr(query).split(/\s+/).filter(w => w.length >= 2)
+  if (palavras.length === 0) return { servidores: [], escolas: [] }
 
-  // ── Professores: filtra por cada palavra no nome (AND implícito) ──
-  // PostgREST não suporta múltiplos ilike AND em uma chamada fluente,
-  // então usamos or() com todas as combinações se for 1 palavra,
-  // e para múltiplas palavras fazemos a interseção no cliente.
-  const profPromise = supabase
-    .from('professores')
-    .select('id, nome, status, nomeacoes(escola:escolas(id,name))')
-    .ilike('nome', `%${query.trim()}%`)  // tentativa direta primeiro
-    .limit(20)
+  function matchAll(nome) {
+    const n = normStr(nome)
+    return palavras.every(p => n.includes(p))
+  }
 
-  // ── Servidores: busca no nome_normalizado (sem acentos, maiúsculo) ──
-  // Para multi-palavra, buscamos com a query completa e também com a
-  // primeira palavra para ampliar o recall, depois filtramos no cliente.
-  const srvQuery = palavras[0] // primeira palavra para busca inicial ampla
-  const srvPromise = supabase
-    .from('servidores_unificado')
-    .select('id, nome, nome_normalizado, escola_raw, telefone, email')
-    .ilike('nome_normalizado', `%${srvQuery}%`)
-    .limit(50) // busca mais e filtra no cliente
-
-  const escolaPromise = supabase
-    .from('escolas')
-    .select('*')
-    .ilike('name', `%${query.trim()}%`)
-    .limit(5)
-
+  // Busca pela primeira palavra em ambas as tabelas (mais ampla)
+  const p1 = palavras[0]
   const [
     { data: profsRaw },
-    { data: servsRaw },
-    { data: escolas },
-  ] = await Promise.all([profPromise, srvPromise, escolaPromise])
-
-  // ── Filtragem multi-palavra no cliente ───────────────────────────────
-  // Garante que TODAS as palavras da query aparecem no nome do resultado.
-
-  function matchesTodas(nome) {
-    const nomeNorm = (nome || '')
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .toUpperCase()
-    return palavras.every(p => nomeNorm.includes(p))
-  }
-
-  const profs = (profsRaw ?? []).filter(p => matchesTodas(p.nome)).slice(0, 8)
-
-  // Para professores: se a busca direta não encontrou (ex: "Ana Velho"),
-  // faz uma segunda tentativa buscando pela primeira palavra e filtrando
-  let profsResult = profs
-  if (profs.length === 0 && palavras.length > 1) {
-    const { data: profsAmplo } = await supabase
+    { data: cadastrosRaw },
+    { data: escolasRaw },
+  ] = await Promise.all([
+    supabase
       .from('professores')
-      .select('id, nome, status, nomeacoes(escola:escolas(id,name))')
-      .ilike('nome', `%${palavras[0]}%`)
-      .limit(100)
-    profsResult = (profsAmplo ?? []).filter(p => matchesTodas(p.nome)).slice(0, 8)
-  }
+      .select('id, nome, status, nomeacoes(escola:escolas(id,name,tipo))')
+      .ilike('nome', `%${p1}%`)
+      .limit(60),
+    supabase
+      .from('servidores_unificado')
+      .select('id, nome, nome_normalizado, escola_raw, telefone, email, endereco, data_nascimento')
+      .ilike('nome_normalizado', `%${p1}%`)
+      .limit(60),
+    supabase
+      .from('escolas')
+      .select('*')
+      .ilike('name', `%${query.trim()}%`)
+      .limit(5),
+  ])
 
-  const servidores = (servsRaw ?? []).filter(s => matchesTodas(s.nome)).slice(0, 8)
+  // Filtra multi-palavra no cliente
+  const profs     = (profsRaw ?? []).filter(p => matchAll(p.nome))
+  const cadastros = (cadastrosRaw ?? []).filter(c => matchAll(c.nome_normalizado || c.nome))
 
-  return {
-    profs:      profsResult,
-    escolas:    escolas ?? [],
-    servidores,
-  }
+  // Índice de nomes dos professores para deduplicação
+  const nomeProfs = new Set(profs.map(p => normStr(p.nome)))
+
+  // Cadastros que já têm professor correspondente → enriquecem o professor
+  const cadastroIdx = {}
+  cadastros.forEach(c => { cadastroIdx[normStr(c.nome_normalizado || c.nome)] = c })
+
+  // Resultado unificado
+  const resultado = []
+
+  profs.forEach(p => {
+    resultado.push({
+      _tipo: 'servidor',
+      id: p.id,
+      nome: p.nome,
+      status: p.status,
+      nomeacoes: p.nomeacoes ?? [],
+      cadastro: cadastroIdx[normStr(p.nome)] ?? null,
+    })
+  })
+
+  // Cadastros sem professor correspondente (pessoal T&A puro)
+  cadastros.forEach(c => {
+    const key = normStr(c.nome_normalizado || c.nome)
+    if (!nomeProfs.has(key)) {
+      resultado.push({
+        _tipo: 'servidor',
+        id: `cad_${c.id}`,
+        nome: c.nome,
+        status: 'Ativo',
+        nomeacoes: [],
+        cadastro: c,
+      })
+    }
+  })
+
+  resultado.sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  return { servidores: resultado.slice(0, 12), escolas: escolasRaw ?? [] }
 }
