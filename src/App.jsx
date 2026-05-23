@@ -1451,7 +1451,7 @@ export default function App() {
       )}
       {editServidor && (
         <EditarServidor
-          servidorId={editServidor.id}
+          servidor={editServidor}
           escolas={escolas}
           isAdmin={admin}
           onBack={(res) => {
