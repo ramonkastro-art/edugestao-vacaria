@@ -8,6 +8,7 @@ import {
   FileText,
   LogOut,
   UserPlus,
+  Edit2,
   CheckCircle2,
   AlertCircle,
   ArrowRightLeft,
@@ -30,6 +31,7 @@ import {
 import { useAuth } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import NovoCadastro from "./pages/NovoCadastro";
+import EditarServidor from "./pages/EditarServidor";
 import {
   useEscolas,
   useServidoresUnificados,
@@ -187,7 +189,7 @@ function BottomNav({ currentView, onNavigate }) {
 // Um único modal com 3 botões: Transferir | Histórico | Mais Dados
 // "Mais Dados" expande uma seção inline com dados cadastrais
 
-function ServidorModal({ servidor, onClose, canTransfer }) {
+function ServidorModal({ servidor, onClose, canTransfer, onEdit }) {
   const [tab, setTab] = useState("nomeacoes"); // "nomeacoes" | "historico" | "dados"
   if (!servidor) return null;
 
@@ -434,6 +436,14 @@ function ServidorModal({ servidor, onClose, canTransfer }) {
               <ArrowRightLeft size={14} /> Transferir
             </button>
           )}
+          {canTransfer && onEdit && (
+            <button
+              onClick={() => onEdit(servidor)}
+              className="flex items-center justify-center gap-1.5 px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 active:scale-95 transition-all"
+            >
+              <Edit2 size={14} />
+            </button>
+          )}
           <button
             onClick={() =>
               setTab(tab === "historico" ? "nomeacoes" : "historico")
@@ -668,7 +678,7 @@ function Dashboard({ onSelectSchool }) {
             ib: "bg-blue-200 text-blue-700",
           },
           {
-            label: "Cadastros",
+            label: "Servidores",
             val: stats?.totalCadastrais,
             icon: UserCog,
             bg: "bg-violet-50",
@@ -1239,6 +1249,7 @@ export default function App() {
   const [view, setView] = useState("dashboard");
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [selectedServidor, setSelectedServidor] = useState(null);
+  const [editServidor, setEditServidor] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -1427,11 +1438,26 @@ export default function App() {
           onOpenServidor={(s) => setSelectedServidor(s)}
         />
       )}
-      {selectedServidor && (
+      {selectedServidor && !editServidor && (
         <ServidorModal
           servidor={selectedServidor}
           onClose={() => setSelectedServidor(null)}
           canTransfer={admin}
+          onEdit={(s) => {
+            setEditServidor(s);
+            setSelectedServidor(null);
+          }}
+        />
+      )}
+      {editServidor && (
+        <EditarServidor
+          servidorId={editServidor.id}
+          escolas={escolas}
+          isAdmin={admin}
+          onBack={(res) => {
+            setEditServidor(null);
+            if (res?.deleted) setSelectedServidor(null);
+          }}
         />
       )}
       <Footer />
