@@ -270,3 +270,67 @@ export async function buscarGlobal(query) {
 
   return { servidores: resultado.slice(0, 12), escolas: escolasRaw ?? [] }
 }
+
+// ─── SALVAR NOVO SERVIDOR ────────────────────────────────────────────────────
+// Insere em servidores_unificado (dados pessoais)
+// Se for professor, insere também em professores + nomeacoes
+
+export async function salvarNovoServidor(dados) {
+  const {
+    nome, email, telefone, endereco, data_nascimento,
+    funcao, escola_raw,
+    // campos só para professores
+    matricula, cargo, tipo_vinculo, escola_id,
+  } = dados
+
+  const nomeNorm = (nome || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().trim()
+
+  // 1. Insere na tabela cadastral (todos os servidores)
+  const { data: cad, error: cadErr } = await supabase
+    .from('servidores_unificado')
+    .insert({
+      nome: nome.trim(),
+      nome_normalizado: nomeNorm,
+      email:            email     || null,
+      telefone:         telefone  || null,
+      endereco:         endereco  || null,
+      data_nascimento:  data_nascimento || null,
+      escola_raw:       escola_raw || null,
+    })
+    .select()
+    .single()
+
+  if (cadErr) return { error: cadErr }
+
+  // 2. Se for professor, insere também na tabela professores + nomeações
+  const ehProfessor = funcao?.toLowerCase().includes('professor') ||
+                      funcao?.toLowerCase().includes('prof')
+
+  if (ehProfessor && escola_id) {
+    const { data: prof, error: profErr } = await supabase
+      .from('professores')
+      .insert({
+        nome:   nome.trim(),
+        status: 'Ativo',
+        email:  email    || null,
+        telefone: telefone || null,
+      })
+      .select()
+      .single()
+
+    if (!profErr && prof) {
+      await supabase.from('nomeacoes').insert({
+        professor_id:   prof.id,
+        escola_id:      parseInt(escola_id),
+        matricula:      matricula    || null,
+        cargo:          cargo        || funcao,
+        tipo_vinculo:   tipo_vinculo || 'Efetivo',
+        ativa:          true,
+      })
+    }
+  }
+
+  return { data: cad, error: null }
+}
