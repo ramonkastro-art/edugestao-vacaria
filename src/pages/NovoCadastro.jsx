@@ -380,6 +380,9 @@ export default function NovoCadastro({ onVoltar, onSucesso }) {
             error={erros.escola_id}
           >
             <option value="">Selecionar escola...</option>
+            {escolas.filter(e => e.tipo === "SMED").map(e => (
+              <option key={e.id} value={e.id}>{e.name}</option>
+            ))}
             {["EMEF", "EMEI", "EMEF Campo"].map(tipo => (
               <optgroup key={tipo} label={`── ${tipo} ──`}>
                 {escolas.filter(e => e.tipo === tipo).map(e => (

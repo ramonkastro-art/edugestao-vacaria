@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   User, Mail, Phone, MapPin, Calendar, Briefcase,
   School, Hash, Save, Loader2, AlertCircle, CheckCircle2,
-  ArrowLeft, Trash2,
+  ArrowLeft, Trash2, X, Plus,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -20,26 +20,12 @@ const FUNCOES = [
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-// Extrai o UUID correto do objeto servidor unificado:
-// - Se tem cadastro.id → é um professor com dados cadastrais → usa cadastro.id (uuid)
-// - Se id começa com "cad_" → remove prefixo → uuid
-// - Se id é número inteiro (professor sem cadastro) → null (não há cadastro para editar)
 function getCadastroId(servidor) {
   if (!servidor) return null;
-
-  // Tem cadastro vinculado → usa o id do cadastro (uuid)
-  if (servidor.cadastro?.id) {
-    return String(servidor.cadastro.id).replace(/^cad_/, "");
-  }
-
-  // id com prefixo cad_ (pessoal T&A puro)
+  if (servidor.cadastro?.id) return String(servidor.cadastro.id).replace(/^cad_/, "");
   const sid = String(servidor.id ?? "");
   if (sid.startsWith("cad_")) return sid.replace("cad_", "");
-
-  // id é uuid direto (sem prefixo, sem cadastro separado)
   if (sid.includes("-") && sid.length > 30) return sid;
-
-  // id é inteiro (professor sem registro em servidores_unificado) → sem cadastro
   return null;
 }
 
@@ -55,11 +41,9 @@ function Field({ icon: Icon, error, disabled, ...props }) {
   return (
     <div>
       <div className={`flex items-center gap-3 px-3 py-3 border rounded-xl transition-colors ${
-        disabled
-          ? "bg-slate-50 border-slate-100 opacity-60"
-          : error
-          ? "bg-red-50 border-red-300"
-          : "bg-slate-50 border-slate-200 focus-within:border-slate-400"
+        disabled ? "bg-slate-50 border-slate-100 opacity-60"
+        : error  ? "bg-red-50 border-red-300"
+                 : "bg-slate-50 border-slate-200 focus-within:border-slate-400"
       }`}>
         {Icon && <Icon size={15} className="shrink-0 text-slate-400"/>}
         <input
@@ -75,13 +59,11 @@ function Field({ icon: Icon, error, disabled, ...props }) {
 
 function SelectField({ icon: Icon, disabled, children, ...props }) {
   return (
-    <div className={`flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl ${disabled ? "opacity-60" : ""}`}>
+    <div className={`flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors ${disabled ? "opacity-60" : ""}`}>
       {Icon && <Icon size={15} className="text-slate-400 shrink-0"/>}
-      <select
-        disabled={disabled}
+      <select disabled={disabled}
         className="flex-1 bg-transparent text-sm outline-none text-slate-800 cursor-pointer disabled:cursor-not-allowed"
-        {...props}
-      >
+        {...props}>
         {children}
       </select>
     </div>
@@ -99,7 +81,7 @@ function ConfirmModal({ nome, onConfirm, onCancel }) {
           <div>
             <p className="text-sm font-semibold text-slate-800">Confirmar exclusão</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              Excluir <strong>{nome}</strong>? Esta ação não pode ser desfeita.
+              Excluir <strong>{nome}</strong>? Não pode ser desfeito.
             </p>
           </div>
         </div>
@@ -120,7 +102,7 @@ function ConfirmModal({ nome, onConfirm, onCancel }) {
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 
-export default function EditarServidor({ servidor, onBack, isAdmin }) {
+export default function EditarServidor({ servidor, onBack, isAdmin, escolas = [] }) {
   const cadastroId = getCadastroId(servidor);
 
   const [form, setForm]           = useState(null);
@@ -132,30 +114,54 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
   const [errors, setErrors]       = useState({});
   const [confirmDel, setConfirmDel] = useState(false);
 
+  // Escola selecionada no select → atualiza escola_raw
+  const [escolasSelecionadas, setEscolasSelecionadas] = useState([]);
+
+  // ── Carrega dados ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!servidor) return;
 
-    // Sem cadastro UUID → monta form com dados básicos do objeto servidor
-    if (!cadastroId) {
+    function montar(data) {
+      // Converte escola_raw (texto separado por vírgula) em array para o select múltiplo
+      const escolasArr = data.escola_raw
+        ? data.escola_raw.split(",").map(e => e.trim()).filter(Boolean)
+        : [];
+      setEscolasSelecionadas(escolasArr);
+
       const f = {
+        nome:            data.nome            ?? "",
+        email:           data.email           ?? "",
+        telefone:        data.telefone        ?? "",
+        data_nascimento: data.data_nascimento ?? "",
+        endereco:        data.endereco        ?? "",
+        funcao:          data.funcao          ?? "",
+        tipo_vinculo:    data.tipo_vinculo    ?? "",
+        matricula:       data.matricula       ?? "",
+      };
+      setForm(f);
+      setOriginal(f);
+      setLoading(false);
+    }
+
+    if (!cadastroId) {
+      // Professor sem cadastro → cria form vazio com dados disponíveis
+      const escolasNom = (servidor.nomeacoes ?? [])
+        .map(n => n.escola?.name).filter(Boolean);
+      montar({
         nome:            servidor.nome ?? "",
         email:           "",
         telefone:        "",
         data_nascimento: "",
         endereco:        "",
-        escola_raw:      (servidor.nomeacoes ?? []).map(n => n.escola?.name).filter(Boolean).join(", "),
         funcao:          servidor.nomeacoes?.[0]?.cargo ?? "",
         tipo_vinculo:    servidor.nomeacoes?.[0]?.tipo_vinculo ?? "",
         matricula:       servidor.nomeacoes?.[0]?.matricula ?? "",
-        _semCadastro:    true,
-      };
-      setForm(f);
-      setOriginal(f);
-      setLoading(false);
+        escola_raw:      escolasNom.join(", "),
+      });
       return;
     }
 
-    // Tem UUID → busca na tabela servidores_unificado
+    // Busca dados cadastrais pelo UUID
     setLoading(true);
     supabase
       .from("servidores_unificado")
@@ -164,39 +170,22 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
       .single()
       .then(({ data, error }) => {
         if (error || !data) {
-          // Fallback: usa dados do objeto servidor em memória
-          const f = {
+          // Fallback com dados do objeto em memória
+          const cad = servidor.cadastro ?? {};
+          montar({
             nome:            servidor.nome ?? "",
-            email:           servidor.cadastro?.email ?? "",
-            telefone:        servidor.cadastro?.telefone ?? "",
-            data_nascimento: servidor.cadastro?.data_nascimento ?? "",
-            endereco:        servidor.cadastro?.endereco ?? "",
-            escola_raw:      servidor.cadastro?.escola_raw ?? "",
+            email:           cad.email            ?? "",
+            telefone:        cad.telefone         ?? "",
+            data_nascimento: cad.data_nascimento  ?? "",
+            endereco:        cad.endereco         ?? "",
             funcao:          "",
             tipo_vinculo:    "",
             matricula:       "",
-            _semCadastro:    false,
-          };
-          setForm(f);
-          setOriginal(f);
-          setLoading(false);
-          return;
+            escola_raw:      cad.escola_raw       ?? "",
+          });
+        } else {
+          montar(data);
         }
-        const f = {
-          nome:            data.nome             ?? "",
-          email:           data.email            ?? "",
-          telefone:        data.telefone         ?? "",
-          data_nascimento: data.data_nascimento  ?? "",
-          endereco:        data.endereco         ?? "",
-          escola_raw:      data.escola_raw       ?? "",
-          funcao:          data.funcao           ?? "",
-          tipo_vinculo:    data.tipo_vinculo     ?? "",
-          matricula:       data.matricula        ?? "",
-          _semCadastro:    false,
-        };
-        setForm(f);
-        setOriginal(f);
-        setLoading(false);
       });
   }, [servidor, cadastroId]);
 
@@ -206,6 +195,18 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: "" }));
   }
 
+  // ── Gerencia lista de escolas selecionadas ─────────────────────────────────
+  function addEscola(nomeEscola) {
+    if (!nomeEscola || escolasSelecionadas.includes(nomeEscola)) return;
+    setEscolasSelecionadas(prev => [...prev, nomeEscola]);
+    setSaved(false);
+  }
+  function removeEscola(idx) {
+    setEscolasSelecionadas(prev => prev.filter((_,i) => i !== idx));
+    setSaved(false);
+  }
+
+  // ── Validação ──────────────────────────────────────────────────────────────
   function validate() {
     const errs = {};
     if (!form.nome?.trim()) errs.nome = "Nome é obrigatório";
@@ -215,6 +216,7 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
     return Object.keys(errs).length === 0;
   }
 
+  // ── Salvar ─────────────────────────────────────────────────────────────────
   async function handleSave() {
     if (!validate()) return;
     setSaving(true); setErro(""); setSaved(false);
@@ -225,27 +227,24 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
     const payload = {
       nome:             form.nome.trim(),
       nome_normalizado: nomeNorm,
-      email:            form.email.trim()     || null,
-      telefone:         form.telefone.trim()  || null,
-      data_nascimento:  form.data_nascimento  || null,
-      endereco:         form.endereco.trim()  || null,
-      escola_raw:       form.escola_raw.trim() || null,
-      funcao:           form.funcao           || null,
-      tipo_vinculo:     form.tipo_vinculo     || null,
-      matricula:        form.matricula.trim() || null,
+      email:            form.email?.trim()     || null,
+      telefone:         form.telefone?.trim()  || null,
+      data_nascimento:  form.data_nascimento   || null,
+      endereco:         form.endereco?.trim()  || null,
+      escola_raw:       escolasSelecionadas.join(", ") || null,
+      funcao:           form.funcao            || null,
+      tipo_vinculo:     form.tipo_vinculo      || null,
+      matricula:        form.matricula?.trim() || null,
       updated_at:       new Date().toISOString(),
     };
 
     let error;
-
     if (cadastroId) {
-      // Atualiza registro existente
       ({ error } = await supabase
         .from("servidores_unificado")
         .update(payload)
         .eq("id", cadastroId));
     } else {
-      // Cria novo cadastro para professor sem registro cadastral
       ({ error } = await supabase
         .from("servidores_unificado")
         .insert(payload));
@@ -253,13 +252,14 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
 
     setSaving(false);
     if (error) {
-      setErro(error.message || "Erro ao salvar. Tente novamente.");
+      setErro(error.message || "Erro ao salvar. Verifique os dados e tente novamente.");
     } else {
       setSaved(true);
       setOriginal({ ...form });
     }
   }
 
+  // ── Excluir ────────────────────────────────────────────────────────────────
   async function handleDelete() {
     setConfirmDel(false);
     if (!cadastroId) { onBack({}); return; }
@@ -267,17 +267,19 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
       .from("servidores_unificado")
       .delete()
       .eq("id", cadastroId);
-    if (!error) onBack({ deleted: true, nome: form.nome });
+    if (!error) onBack({ deleted: true, nome: form?.nome });
     else setErro("Erro ao excluir: " + error.message);
   }
 
-  const dirty = form && original &&
-    Object.keys(form)
-      .filter(k => k !== "_semCadastro")
-      .some(k => (form[k] ?? "") !== (original[k] ?? ""));
+  // Detecta alterações (form ou lista de escolas)
+  const originalEscolas = original
+    ? (servidor?.cadastro?.escola_raw ?? servidor?.nomeacoes?.map(n=>n.escola?.name).filter(Boolean).join(", ") ?? "")
+        .split(",").map(e=>e.trim()).filter(Boolean)
+    : [];
+  const dirty = (form && original && Object.keys(form).some(k => (form[k]??"") !== (original[k]??"")))
+    || JSON.stringify(escolasSelecionadas) !== JSON.stringify(originalEscolas);
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
-
+  // ── LOADING ────────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
       <div className="bg-white rounded-3xl p-8 flex items-center gap-4 shadow-2xl">
@@ -288,6 +290,9 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
   );
 
   if (!form) return null;
+
+  // Escolas disponíveis para adicionar (todas - já selecionadas)
+  const escolasDisponiveis = escolas.filter(e => !escolasSelecionadas.includes(e.name));
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/25 backdrop-blur-sm"
@@ -309,7 +314,7 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
           <div className="flex-1 min-w-0">
             <p className="text-base font-semibold text-slate-900 truncate">{form.nome || "Editar Servidor"}</p>
             <p className="text-xs text-slate-400 mt-0.5">
-              {cadastroId ? "Dados cadastrais" : "Criar cadastro para este servidor"}
+              {cadastroId ? "Editar dados cadastrais" : "Criar ficha cadastral"}
             </p>
           </div>
           {dirty && (
@@ -319,22 +324,23 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
           )}
         </div>
 
-        {/* Corpo — scrollável */}
+        {/* Corpo scrollável */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
 
-          {/* Aviso professor sem cadastro */}
-          {form._semCadastro && (
+          {!cadastroId && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-2">
               <AlertCircle size={14} className="text-blue-500 shrink-0 mt-0.5"/>
               <p className="text-xs text-blue-700">
-                Este professor não tem dados cadastrais registrados. Preencha abaixo para criar o cadastro.
+                Este servidor não tem ficha cadastral. Preencha para criar.
               </p>
             </div>
           )}
 
           {/* Dados pessoais */}
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Dados Pessoais</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100">
+              Dados Pessoais
+            </p>
             <div>
               <FieldLabel required>Nome completo</FieldLabel>
               <Field icon={User} value={form.nome} onChange={e=>set("nome",e.target.value)}
@@ -369,7 +375,63 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
 
           {/* Vínculo */}
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Vínculo Funcional</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100">
+              Vínculo Funcional
+            </p>
+
+            {/* Escola(s) — select múltiplo com tags */}
+            <div>
+              <FieldLabel>Escola(s) de lotação</FieldLabel>
+
+              {/* Tags das escolas já selecionadas */}
+              {escolasSelecionadas.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {escolasSelecionadas.map((e, i) => (
+                    <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-medium text-blue-700">
+                      <School size={11}/>
+                      <span className="max-w-[160px] truncate">{e}</span>
+                      {isAdmin && (
+                        <button onClick={() => removeEscola(i)}
+                          className="ml-0.5 hover:text-red-500 transition-colors">
+                          <X size={12}/>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Select para adicionar escola */}
+              {isAdmin && (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex items-center gap-3 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors">
+                    <School size={14} className="text-slate-400 shrink-0"/>
+                    <select
+                      className="flex-1 bg-transparent text-sm outline-none text-slate-600 cursor-pointer"
+                      onChange={e => { addEscola(e.target.value); e.target.value = ""; }}
+                      defaultValue=""
+                    >
+                      <option value="">+ Adicionar escola...</option>
+                      {/* SMED primeiro */}
+                      {escolasDisponiveis.filter(e=>e.tipo==="SMED").map(e=>(
+                        <option key={e.id} value={e.name}>{e.name}</option>
+                      ))}
+                      {["EMEF","EMEI","EMEF Campo"].map(tipo=>(
+                        <optgroup key={tipo} label={`── ${tipo}`}>
+                          {escolasDisponiveis.filter(e=>e.tipo===tipo).map(e=>(
+                            <option key={e.id} value={e.name}>{e.name}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+              {escolasSelecionadas.length === 0 && (
+                <p className="text-xs text-slate-400 mt-1">Nenhuma escola vinculada</p>
+              )}
+            </div>
+
             <div>
               <FieldLabel>Função / Cargo</FieldLabel>
               <SelectField icon={Briefcase} value={form.funcao}
@@ -378,13 +440,7 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
                 {FUNCOES.map(f=><option key={f}>{f}</option>)}
               </SelectField>
             </div>
-            <div>
-              <FieldLabel>Escola(s)</FieldLabel>
-              <Field icon={School} value={form.escola_raw}
-                onChange={e=>set("escola_raw",e.target.value)}
-                placeholder="Ex.: EMEF Coronel Avelino" disabled={!isAdmin}/>
-              <p className="text-xs text-slate-400 mt-1">Separe com vírgula para múltiplas escolas</p>
-            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <FieldLabel>Matrícula</FieldLabel>
@@ -420,18 +476,18 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
             </div>
           )}
           {!isAdmin && (
-            <p className="text-xs text-slate-400 text-center">
+            <p className="text-xs text-slate-400 text-center py-2">
               Apenas Secretaria e RH podem editar cadastros.
             </p>
           )}
         </div>
 
-        {/* Rodapé com botões */}
+        {/* Rodapé */}
         {isAdmin && (
           <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
             <button onClick={() => setConfirmDel(true)}
               className="flex items-center gap-1.5 px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
-              <Trash2 size={14}/> Excluir
+              <Trash2 size={14}/>
             </button>
             <button onClick={handleSave} disabled={saving || !dirty}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 active:scale-95 transition-all">
@@ -446,7 +502,7 @@ export default function EditarServidor({ servidor, onBack, isAdmin }) {
 
       {confirmDel && (
         <ConfirmModal
-          nome={form.nome}
+          nome={form?.nome}
           onConfirm={handleDelete}
           onCancel={() => setConfirmDel(false)}
         />
