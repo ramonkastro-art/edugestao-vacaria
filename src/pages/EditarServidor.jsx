@@ -1,340 +1,221 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react'
 import {
   User, Mail, Phone, MapPin, Calendar, Briefcase,
   School, Hash, Save, Loader2, AlertCircle, CheckCircle2,
-  ArrowLeft, Trash2, X, Plus,
-} from "lucide-react";
-import { supabase } from "../lib/supabase";
-
-// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+  ArrowLeft, Trash2, X, GraduationCap,
+} from 'lucide-react'
+import { atualizarServidor, atualizarLotacoes, excluirServidor, criarServidor } from '../hooks/useData'
 
 const FUNCOES = [
-  "Professor(a) Ed. Básica I","Professor(a) Ed. Básica II",
-  "Professor(a) Ed. Infantil","Professor(a) Ed. Física",
-  "Professor(a) Ed. Especial","Diretor(a)",
-  "Coordenador(a) Pedagógico(a)","Secretário(a) Escolar",
-  "Assistente Administrativo","Técnico Administrativo",
-  "Merendeira","Servente","Zelador(a)","Porteiro(a)","Vigia",
-  "Auxiliar de Serviços Gerais","Atendente / Monitor(a)","Outro",
-];
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-function getCadastroId(servidor) {
-  if (!servidor) return null;
-  if (servidor.cadastro?.id) return String(servidor.cadastro.id).replace(/^cad_/, "");
-  const sid = String(servidor.id ?? "");
-  if (sid.startsWith("cad_")) return sid.replace("cad_", "");
-  if (sid.includes("-") && sid.length > 30) return sid;
-  return null;
-}
+  { g: 'Docentes',              v: 'Professor(a) Ed. Básica I' },
+  { g: 'Docentes',              v: 'Professor(a) Ed. Básica II' },
+  { g: 'Docentes',              v: 'Professor(a) Ed. Infantil' },
+  { g: 'Docentes',              v: 'Professor(a) Ed. Física' },
+  { g: 'Docentes',              v: 'Professor(a) Ed. Especial' },
+  { g: 'Gestão',                v: 'Diretor(a)' },
+  { g: 'Gestão',                v: 'Coordenador(a) Pedagógico(a)' },
+  { g: 'Técnico-Administrativo',v: 'Secretário(a) Escolar' },
+  { g: 'Técnico-Administrativo',v: 'Assistente Administrativo' },
+  { g: 'Técnico-Administrativo',v: 'Técnico Administrativo' },
+  { g: 'Apoio',                 v: 'Merendeira' },
+  { g: 'Apoio',                 v: 'Servente' },
+  { g: 'Apoio',                 v: 'Zelador(a)' },
+  { g: 'Apoio',                 v: 'Porteiro(a)' },
+  { g: 'Apoio',                 v: 'Vigia' },
+  { g: 'Apoio',                 v: 'Auxiliar de Serviços Gerais' },
+  { g: 'Apoio',                 v: 'Atendente / Monitor(a)' },
+  { g: 'Outros',                v: 'Outro' },
+]
+const GRUPOS = [...new Set(FUNCOES.map(f => f.g))]
+const VINCULOS = ['Efetivo', 'Designação', 'Contratado', 'Temporário', 'Estágio']
 
 function FieldLabel({ children, required }) {
   return (
     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
       {children}{required && <span className="text-red-400 ml-1">*</span>}
     </label>
-  );
+  )
 }
-
-function Field({ icon: Icon, error, disabled, ...props }) {
+function Input({ icon: Icon, error, disabled, ...props }) {
   return (
     <div>
       <div className={`flex items-center gap-3 px-3 py-3 border rounded-xl transition-colors ${
-        disabled ? "bg-slate-50 border-slate-100 opacity-60"
-        : error  ? "bg-red-50 border-red-300"
-                 : "bg-slate-50 border-slate-200 focus-within:border-slate-400"
+        disabled ? 'bg-slate-50 border-slate-100 opacity-60'
+        : error  ? 'bg-red-50 border-red-300'
+                 : 'bg-slate-50 border-slate-200 focus-within:border-slate-400'
       }`}>
-        {Icon && <Icon size={15} className="shrink-0 text-slate-400"/>}
-        <input
-          disabled={disabled}
+        {Icon && <Icon size={15} className="shrink-0 text-slate-400" />}
+        <input disabled={disabled}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-300 text-slate-800 disabled:cursor-not-allowed"
-          {...props}
-        />
+          {...props} />
       </div>
-      {error && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={11}/>{error}</p>}
+      {error && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={11} />{error}</p>}
     </div>
-  );
+  )
 }
-
-function SelectField({ icon: Icon, disabled, children, ...props }) {
+function SelectInput({ icon: Icon, disabled, children, ...props }) {
   return (
-    <div className={`flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors ${disabled ? "opacity-60" : ""}`}>
-      {Icon && <Icon size={15} className="text-slate-400 shrink-0"/>}
+    <div className={`flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors ${disabled ? 'opacity-60' : ''}`}>
+      {Icon && <Icon size={15} className="text-slate-400 shrink-0" />}
       <select disabled={disabled}
         className="flex-1 bg-transparent text-sm outline-none text-slate-800 cursor-pointer disabled:cursor-not-allowed"
         {...props}>
         {children}
       </select>
     </div>
-  );
+  )
 }
-
 function ConfirmModal({ nome, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
-            <Trash2 size={18} className="text-red-600"/>
+            <Trash2 size={18} className="text-red-600" />
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-800">Confirmar exclusão</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Excluir <strong>{nome}</strong>? Não pode ser desfeito.
-            </p>
+            <p className="text-xs text-slate-500 mt-0.5">Excluir <strong>{nome}</strong>? Não pode ser desfeito.</p>
           </div>
         </div>
         <div className="flex gap-3">
           <button onClick={onCancel}
-            className="flex-1 py-2.5 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            className="flex-1 py-2.5 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50">
             Cancelar
           </button>
           <button onClick={onConfirm}
-            className="flex-1 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700 transition-colors">
+            className="flex-1 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700">
             Excluir
           </button>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-// ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
+export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, escolas = [], isNovo = false }) {
+  const [form, setForm] = useState({
+    nome:            servidor?.nome            ?? '',
+    status:          servidor?.status          ?? 'Ativo',
+    funcao:          servidor?.funcao          ?? '',
+    tipo_vinculo:    servidor?.tipo_vinculo    ?? '',
+    matricula:       servidor?.matricula       ?? '',
+    email:           servidor?.email           ?? '',
+    telefone:        servidor?.telefone        ?? '',
+    data_nascimento: servidor?.data_nascimento ?? '',
+    endereco:        servidor?.endereco        ?? '',
+    formacao:        servidor?.formacao        ?? '',
+    observacoes:     servidor?.observacoes     ?? '',
+  })
 
-export default function EditarServidor({ servidor, onBack, isAdmin, escolas = [] }) {
-  const cadastroId = getCadastroId(servidor);
+  // Escolas vinculadas (ids como strings)
+  const [escolasSel, setEscolasSel] = useState(
+    (servidor?.lotacoes ?? []).map(l => String(l.escola_id))
+  )
 
-  const [form, setForm]           = useState(null);
-  const [original, setOriginal]   = useState(null);
-  const [loading, setLoading]     = useState(true);
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
-  const [erro, setErro]           = useState("");
-  const [errors, setErrors]       = useState({});
-  const [confirmDel, setConfirmDel] = useState(false);
+  const [saving, setSaving]   = useState(false)
+  const [saved, setSaved]     = useState(false)
+  const [erro, setErro]       = useState('')
+  const [errors, setErrors]   = useState({})
+  const [confirmDel, setConfirmDel] = useState(false)
 
-  // Escola selecionada no select → atualiza escola_raw
-  const [escolasSelecionadas, setEscolasSelecionadas] = useState([]);
-
-  // ── Carrega dados ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!servidor) return;
-
-    function montar(data) {
-      // Converte escola_raw (texto separado por vírgula) em array para o select múltiplo
-      const escolasArr = data.escola_raw
-        ? data.escola_raw.split(",").map(e => e.trim()).filter(Boolean)
-        : [];
-      setEscolasSelecionadas(escolasArr);
-
-      const f = {
-        nome:            data.nome            ?? "",
-        email:           data.email           ?? "",
-        telefone:        data.telefone        ?? "",
-        data_nascimento: data.data_nascimento ?? "",
-        endereco:        data.endereco        ?? "",
-        funcao:          data.funcao          ?? "",
-        tipo_vinculo:    data.tipo_vinculo    ?? "",
-        matricula:       data.matricula       ?? "",
-      };
-      setForm(f);
-      setOriginal(f);
-      setLoading(false);
-    }
-
-    if (!cadastroId) {
-      // Professor sem cadastro → cria form vazio com dados disponíveis
-      const escolasNom = (servidor.nomeacoes ?? [])
-        .map(n => n.escola?.name).filter(Boolean);
-      montar({
-        nome:            servidor.nome ?? "",
-        email:           "",
-        telefone:        "",
-        data_nascimento: "",
-        endereco:        "",
-        funcao:          servidor.nomeacoes?.[0]?.cargo ?? "",
-        tipo_vinculo:    servidor.nomeacoes?.[0]?.tipo_vinculo ?? "",
-        matricula:       servidor.nomeacoes?.[0]?.matricula ?? "",
-        escola_raw:      escolasNom.join(", "),
-      });
-      return;
-    }
-
-    // Busca dados cadastrais pelo UUID
-    setLoading(true);
-    supabase
-      .from("servidores_unificado")
-      .select("*")
-      .eq("id", cadastroId)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          // Fallback com dados do objeto em memória
-          const cad = servidor.cadastro ?? {};
-          montar({
-            nome:            servidor.nome ?? "",
-            email:           cad.email            ?? "",
-            telefone:        cad.telefone         ?? "",
-            data_nascimento: cad.data_nascimento  ?? "",
-            endereco:        cad.endereco         ?? "",
-            funcao:          "",
-            tipo_vinculo:    "",
-            matricula:       "",
-            escola_raw:      cad.escola_raw       ?? "",
-          });
-        } else {
-          montar(data);
-        }
-      });
-  }, [servidor, cadastroId]);
-
-  function set(field, val) {
-    setForm(prev => ({ ...prev, [field]: val }));
-    setSaved(false);
-    if (errors[field]) setErrors(prev => ({ ...prev, [field]: "" }));
+  function set(k, v) {
+    setForm(p => ({ ...p, [k]: v }))
+    setSaved(false)
+    if (errors[k]) setErrors(p => ({ ...p, [k]: '' }))
   }
 
-  // ── Gerencia lista de escolas selecionadas ─────────────────────────────────
-  function addEscola(nomeEscola) {
-    if (!nomeEscola || escolasSelecionadas.includes(nomeEscola)) return;
-    setEscolasSelecionadas(prev => [...prev, nomeEscola]);
-    setSaved(false);
+  function addEscola(id) {
+    if (!id || escolasSel.includes(id)) return
+    setEscolasSel(p => [...p, id])
+    setSaved(false)
   }
-  function removeEscola(idx) {
-    setEscolasSelecionadas(prev => prev.filter((_,i) => i !== idx));
-    setSaved(false);
+  function removeEscola(id) {
+    setEscolasSel(p => p.filter(e => e !== id))
+    setSaved(false)
   }
 
-  // ── Validação ──────────────────────────────────────────────────────────────
   function validate() {
-    const errs = {};
-    if (!form.nome?.trim()) errs.nome = "Nome é obrigatório";
+    const errs = {}
+    if (!form.nome.trim()) errs.nome = 'Nome é obrigatório'
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      errs.email = "E-mail inválido";
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+      errs.email = 'E-mail inválido'
+    setErrors(errs)
+    return !Object.keys(errs).length
   }
 
-  // ── Salvar ─────────────────────────────────────────────────────────────────
   async function handleSave() {
-    if (!validate()) return;
-    setSaving(true); setErro(""); setSaved(false);
+    if (!validate()) return
+    setSaving(true); setErro(''); setSaved(false)
 
-    const nomeNorm = (form.nome || "")
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-
-    const payload = {
-      nome:             form.nome.trim(),
-      nome_normalizado: nomeNorm,
-      email:            form.email?.trim()     || null,
-      telefone:         form.telefone?.trim()  || null,
-      data_nascimento:  form.data_nascimento   || null,
-      endereco:         form.endereco?.trim()  || null,
-      escola_raw:       escolasSelecionadas.join(", ") || null,
-      funcao:           form.funcao            || null,
-      tipo_vinculo:     form.tipo_vinculo      || null,
-      matricula:        form.matricula?.trim() || null,
-      updated_at:       new Date().toISOString(),
-    };
-
-    let error;
-    if (cadastroId) {
-      ({ error } = await supabase
-        .from("servidores_unificado")
-        .update(payload)
-        .eq("id", cadastroId));
+    let error
+    if (isNovo) {
+      const res = await criarServidor(form, escolasSel)
+      error = res.error
     } else {
-      ({ error } = await supabase
-        .from("servidores_unificado")
-        .insert(payload));
+      const [r1, r2] = await Promise.all([
+        atualizarServidor(servidor.id, form),
+        atualizarLotacoes(servidor.id, escolasSel),
+      ])
+      error = r1.error ?? r2.error
     }
 
-    setSaving(false);
+    setSaving(false)
     if (error) {
-      setErro(error.message || "Erro ao salvar. Verifique os dados e tente novamente.");
+      setErro(error.message || 'Erro ao salvar. Tente novamente.')
     } else {
-      setSaved(true);
-      setOriginal({ ...form });
+      setSaved(true)
+      setTimeout(() => { onSaved?.(); onClose?.() }, 800)
     }
   }
 
-  // ── Excluir ────────────────────────────────────────────────────────────────
   async function handleDelete() {
-    setConfirmDel(false);
-    if (!cadastroId) { onBack({}); return; }
-    const { error } = await supabase
-      .from("servidores_unificado")
-      .delete()
-      .eq("id", cadastroId);
-    if (!error) onBack({ deleted: true, nome: form?.nome });
-    else setErro("Erro ao excluir: " + error.message);
+    setConfirmDel(false)
+    const { error } = await excluirServidor(servidor.id)
+    if (!error) { onDeleted?.(); onClose?.() }
+    else setErro('Erro ao excluir: ' + error.message)
   }
 
-  // Detecta alterações (form ou lista de escolas)
-  const originalEscolas = original
-    ? (servidor?.cadastro?.escola_raw ?? servidor?.nomeacoes?.map(n=>n.escola?.name).filter(Boolean).join(", ") ?? "")
-        .split(",").map(e=>e.trim()).filter(Boolean)
-    : [];
-  const dirty = (form && original && Object.keys(form).some(k => (form[k]??"") !== (original[k]??"")))
-    || JSON.stringify(escolasSelecionadas) !== JSON.stringify(originalEscolas);
+  const escolasDisponiveis = escolas.filter(e => !escolasSel.includes(String(e.id)))
+  const escolasVinculadas  = escolasSel
+    .map(id => escolas.find(e => String(e.id) === id))
+    .filter(Boolean)
 
-  // ── LOADING ────────────────────────────────────────────────────────────────
-  if (loading) return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl p-8 flex items-center gap-4 shadow-2xl">
-        <Loader2 size={22} className="animate-spin text-slate-400"/>
-        <p className="text-sm text-slate-600">Carregando dados…</p>
-      </div>
-    </div>
-  );
-
-  if (!form) return null;
-
-  // Escolas disponíveis para adicionar (todas - já selecionadas)
-  const escolasDisponiveis = escolas.filter(e => !escolasSelecionadas.includes(e.name));
+  const TIPO_COLORS = {
+    EMEI: 'bg-violet-50 text-violet-700 border-violet-200',
+    EMEF: 'bg-blue-50 text-blue-700 border-blue-200',
+    'EMEF Campo': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    SMED: 'bg-rose-50 text-rose-700 border-rose-200',
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/25 backdrop-blur-sm"
-      onClick={() => !dirty && onBack({})}>
-      <div
-        className="bg-white w-full md:max-w-lg md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
+      onClick={onClose}>
+      <div className="bg-white w-full md:max-w-lg md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col"
+        onClick={e => e.stopPropagation()}>
+
         {/* Drag handle mobile */}
         <div className="flex justify-center pt-3 pb-1 md:hidden shrink-0">
-          <div className="w-10 h-1 rounded-full bg-slate-200"/>
+          <div className="w-10 h-1 rounded-full bg-slate-200" />
         </div>
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
-          <button onClick={() => onBack({})} className="p-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0">
-            <ArrowLeft size={17} className="text-slate-500"/>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0">
+            <ArrowLeft size={17} className="text-slate-500" />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-base font-semibold text-slate-900 truncate">{form.nome || "Editar Servidor"}</p>
+            <p className="text-base font-semibold text-slate-900 truncate">
+              {isNovo ? 'Novo Servidor' : (form.nome || 'Editar Servidor')}
+            </p>
             <p className="text-xs text-slate-400 mt-0.5">
-              {cadastroId ? "Editar dados cadastrais" : "Criar ficha cadastral"}
+              {isNovo ? 'Preencha os dados do novo servidor' : 'Editar dados cadastrais'}
             </p>
           </div>
-          {dirty && (
-            <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-1 rounded-xl shrink-0">
-              Não salvo
-            </span>
-          )}
         </div>
 
         {/* Corpo scrollável */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-
-          {!cadastroId && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-2">
-              <AlertCircle size={14} className="text-blue-500 shrink-0 mt-0.5"/>
-              <p className="text-xs text-blue-700">
-                Este servidor não tem ficha cadastral. Preencha para criar.
-              </p>
-            </div>
-          )}
 
           {/* Dados pessoais */}
           <div className="space-y-3">
@@ -343,121 +224,137 @@ export default function EditarServidor({ servidor, onBack, isAdmin, escolas = []
             </p>
             <div>
               <FieldLabel required>Nome completo</FieldLabel>
-              <Field icon={User} value={form.nome} onChange={e=>set("nome",e.target.value)}
-                placeholder="Nome completo" error={errors.nome} disabled={!isAdmin}/>
+              <Input icon={User} value={form.nome} onChange={e => set('nome', e.target.value)}
+                placeholder="Nome completo" error={errors.nome} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <FieldLabel>Nascimento</FieldLabel>
-                <Field icon={Calendar} type="date" value={form.data_nascimento}
-                  onChange={e=>set("data_nascimento",e.target.value)} disabled={!isAdmin}/>
+                <FieldLabel>Status</FieldLabel>
+                <SelectInput value={form.status} onChange={e => set('status', e.target.value)}>
+                  <option>Ativo</option>
+                  <option>Afastado</option>
+                  <option>Inativo</option>
+                </SelectInput>
               </div>
               <div>
-                <FieldLabel>Telefone</FieldLabel>
-                <Field icon={Phone} type="tel" value={form.telefone}
-                  onChange={e=>set("telefone",e.target.value)}
-                  placeholder="(54) 9 9999-9999" disabled={!isAdmin}/>
+                <FieldLabel>Nascimento</FieldLabel>
+                <Input icon={Calendar} type="date" value={form.data_nascimento}
+                  onChange={e => set('data_nascimento', e.target.value)} />
               </div>
             </div>
-            <div>
-              <FieldLabel>E-mail</FieldLabel>
-              <Field icon={Mail} type="email" value={form.email}
-                onChange={e=>set("email",e.target.value)}
-                placeholder="email@exemplo.com" error={errors.email} disabled={!isAdmin}/>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Telefone</FieldLabel>
+                <Input icon={Phone} type="tel" value={form.telefone}
+                  onChange={e => set('telefone', e.target.value)} placeholder="(54) 9 9999-9999" />
+              </div>
+              <div>
+                <FieldLabel>E-mail</FieldLabel>
+                <Input icon={Mail} type="email" value={form.email}
+                  onChange={e => set('email', e.target.value)}
+                  placeholder="email@..." error={errors.email} />
+              </div>
             </div>
             <div>
               <FieldLabel>Endereço</FieldLabel>
-              <Field icon={MapPin} value={form.endereco}
-                onChange={e=>set("endereco",e.target.value)}
-                placeholder="Rua, número, bairro" disabled={!isAdmin}/>
+              <Input icon={MapPin} value={form.endereco}
+                onChange={e => set('endereco', e.target.value)} placeholder="Rua, número, bairro" />
+            </div>
+            <div>
+              <FieldLabel>Formação</FieldLabel>
+              <Input icon={GraduationCap} value={form.formacao}
+                onChange={e => set('formacao', e.target.value)} placeholder="Ex.: Pedagogia, Letras..." />
             </div>
           </div>
 
-          {/* Vínculo */}
+          {/* Vínculo funcional */}
           <div className="space-y-3">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider pb-1 border-b border-slate-100">
               Vínculo Funcional
             </p>
 
-            {/* Escola(s) — select múltiplo com tags */}
+            <div>
+              <FieldLabel>Função / Cargo</FieldLabel>
+              <SelectInput icon={Briefcase} value={form.funcao} onChange={e => set('funcao', e.target.value)}>
+                <option value="">Não informado</option>
+                {GRUPOS.map(g => (
+                  <optgroup key={g} label={`── ${g}`}>
+                    {FUNCOES.filter(f => f.g === g).map(f => (
+                      <option key={f.v}>{f.v}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </SelectInput>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Tipo de vínculo</FieldLabel>
+                <SelectInput value={form.tipo_vinculo} onChange={e => set('tipo_vinculo', e.target.value)}>
+                  <option value="">Não informado</option>
+                  {VINCULOS.map(v => <option key={v}>{v}</option>)}
+                </SelectInput>
+              </div>
+              <div>
+                <FieldLabel>Matrícula</FieldLabel>
+                <Input icon={Hash} value={form.matricula}
+                  onChange={e => set('matricula', e.target.value)} placeholder="2024-0512" />
+              </div>
+            </div>
+
+            {/* Escolas vinculadas como tags */}
             <div>
               <FieldLabel>Escola(s) de lotação</FieldLabel>
 
-              {/* Tags das escolas já selecionadas */}
-              {escolasSelecionadas.length > 0 && (
+              {escolasVinculadas.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {escolasSelecionadas.map((e, i) => (
-                    <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-medium text-blue-700">
-                      <School size={11}/>
-                      <span className="max-w-[160px] truncate">{e}</span>
-                      {isAdmin && (
-                        <button onClick={() => removeEscola(i)}
-                          className="ml-0.5 hover:text-red-500 transition-colors">
-                          <X size={12}/>
-                        </button>
-                      )}
+                  {escolasVinculadas.map(e => (
+                    <div key={e.id}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-xs font-medium text-blue-700">
+                      <School size={11} />
+                      <span className="max-w-[180px] truncate">{e.name}</span>
+                      <button onClick={() => removeEscola(String(e.id))}
+                        className="ml-0.5 hover:text-red-500 transition-colors">
+                        <X size={12} />
+                      </button>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Select para adicionar escola */}
-              {isAdmin && (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-3 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors">
-                    <School size={14} className="text-slate-400 shrink-0"/>
-                    <select
-                      className="flex-1 bg-transparent text-sm outline-none text-slate-600 cursor-pointer"
-                      onChange={e => { addEscola(e.target.value); e.target.value = ""; }}
-                      defaultValue=""
-                    >
-                      <option value="">+ Adicionar escola...</option>
-                      {/* SMED primeiro */}
-                      {escolasDisponiveis.filter(e=>e.tipo==="SMED").map(e=>(
-                        <option key={e.id} value={e.name}>{e.name}</option>
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors">
+                <School size={14} className="text-slate-400 shrink-0" />
+                <select
+                  className="flex-1 bg-transparent text-sm outline-none text-slate-600 cursor-pointer"
+                  onChange={e => { addEscola(e.target.value); e.target.value = '' }}
+                  defaultValue=""
+                >
+                  <option value="">+ Adicionar escola...</option>
+                  {/* SMED primeiro */}
+                  {escolasDisponiveis.filter(e => e.tipo === 'SMED').map(e => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                  {['EMEF', 'EMEI', 'EMEF Campo'].map(tipo => (
+                    <optgroup key={tipo} label={`── ${tipo}`}>
+                      {escolasDisponiveis.filter(e => e.tipo === tipo).map(e => (
+                        <option key={e.id} value={e.id}>{e.name}</option>
                       ))}
-                      {["EMEF","EMEI","EMEF Campo"].map(tipo=>(
-                        <optgroup key={tipo} label={`── ${tipo}`}>
-                          {escolasDisponiveis.filter(e=>e.tipo===tipo).map(e=>(
-                            <option key={e.id} value={e.name}>{e.name}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-              {escolasSelecionadas.length === 0 && (
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+              {escolasVinculadas.length === 0 && (
                 <p className="text-xs text-slate-400 mt-1">Nenhuma escola vinculada</p>
               )}
             </div>
 
             <div>
-              <FieldLabel>Função / Cargo</FieldLabel>
-              <SelectField icon={Briefcase} value={form.funcao}
-                onChange={e=>set("funcao",e.target.value)} disabled={!isAdmin}>
-                <option value="">Não informado</option>
-                {FUNCOES.map(f=><option key={f}>{f}</option>)}
-              </SelectField>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <FieldLabel>Matrícula</FieldLabel>
-                <Field icon={Hash} value={form.matricula}
-                  onChange={e=>set("matricula",e.target.value)}
-                  placeholder="2024-0512" disabled={!isAdmin}/>
-              </div>
-              <div>
-                <FieldLabel>Vínculo</FieldLabel>
-                <SelectField value={form.tipo_vinculo}
-                  onChange={e=>set("tipo_vinculo",e.target.value)} disabled={!isAdmin}>
-                  <option value="">Não informado</option>
-                  <option>Efetivo</option>
-                  <option>Designação</option>
-                  <option>Contratado</option>
-                  <option>Estágio</option>
-                </SelectField>
+              <FieldLabel>Observações</FieldLabel>
+              <div className="flex items-start gap-3 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors">
+                <textarea rows={2} value={form.observacoes}
+                  onChange={e => set('observacoes', e.target.value)}
+                  placeholder="Observações gerais..."
+                  className="flex-1 bg-transparent text-sm outline-none resize-none placeholder:text-slate-300 text-slate-800" />
               </div>
             </div>
           </div>
@@ -465,48 +362,43 @@ export default function EditarServidor({ servidor, onBack, isAdmin, escolas = []
           {/* Feedback */}
           {erro && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
-              <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5"/>
+              <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
               <p className="text-sm text-red-600">{erro}</p>
             </div>
           )}
           {saved && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
-              <CheckCircle2 size={14} className="text-emerald-600"/>
-              <p className="text-sm text-emerald-700">Dados salvos com sucesso!</p>
+              <CheckCircle2 size={14} className="text-emerald-600" />
+              <p className="text-sm text-emerald-700">Salvo com sucesso!</p>
             </div>
-          )}
-          {!isAdmin && (
-            <p className="text-xs text-slate-400 text-center py-2">
-              Apenas Secretaria e RH podem editar cadastros.
-            </p>
           )}
         </div>
 
         {/* Rodapé */}
-        {isAdmin && (
-          <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+          {!isNovo && (
             <button onClick={() => setConfirmDel(true)}
               className="flex items-center gap-1.5 px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
-              <Trash2 size={14}/>
+              <Trash2 size={14} />
             </button>
-            <button onClick={handleSave} disabled={saving || !dirty}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 active:scale-95 transition-all">
-              {saving
-                ? <><Loader2 size={14} className="animate-spin"/> Salvando…</>
-                : <><Save size={14}/> {dirty ? "Salvar alterações" : "Sem alterações"}</>
-              }
-            </button>
-          </div>
-        )}
+          )}
+          <button onClick={onClose}
+            className="px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            Cancelar
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 active:scale-95 transition-all">
+            {saving
+              ? <><Loader2 size={14} className="animate-spin" /> Salvando…</>
+              : <><Save size={14} /> {isNovo ? 'Criar servidor' : 'Salvar alterações'}</>
+            }
+          </button>
+        </div>
       </div>
 
       {confirmDel && (
-        <ConfirmModal
-          nome={form?.nome}
-          onConfirm={handleDelete}
-          onCancel={() => setConfirmDel(false)}
-        />
+        <ConfirmModal nome={form.nome} onConfirm={handleDelete} onCancel={() => setConfirmDel(false)} />
       )}
     </div>
-  );
+  )
 }
