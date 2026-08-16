@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   X, School, AlertCircle, GraduationCap, Briefcase,
   Phone, Mail, MapPin, Calendar, Hash, ArrowRightLeft,
-  FileText, Clock, Info, Edit2, ChevronRight, Loader2,
+  FileText, Clock, History, Info, Edit2, ChevronRight, Loader2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -20,7 +20,7 @@ function Badge({ children, className = '' }) {
   return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${className}`}>{children}</span>
 }
 
-export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, canEdit }) {
+export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, onAddHistorico, canEdit }) {
   const [tab, setTab] = useState('escola') // 'escola' | 'dados' | 'historico'
   const [cadastro, setCadastro] = useState(null)
   const [loadingCadastro, setLoadingCadastro] = useState(false)
@@ -186,7 +186,17 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, c
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Dados Pessoais</p>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Dados Pessoais</p>
+                  {canEdit && (
+                    <button
+                      onClick={() => { onClose(); onEdit(servidor) }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-medium hover:bg-slate-200 transition-colors"
+                    >
+                      <Edit2 size={13} /> Editar dados
+                    </button>
+                  )}
+                </div>
                 {dadosBase.data_nascimento && (
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
                     <Calendar size={15} className="text-slate-400 shrink-0" />
@@ -256,43 +266,55 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, c
 
           {/* ABA: Histórico */}
           {tab === 'historico' && (
-            loadingHistorico ? (
-              <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
-            ) : historico.length === 0 ? (
-              <div className="text-center py-10 text-slate-400">
-                <Clock size={28} className="mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Nenhuma movimentação registrada</p>
-                <p className="text-xs text-slate-300 mt-1">As próximas transferências aparecerão aqui.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Histórico de lotações</p>
-                {historico.map((lotacao, index) => {
-                  const inicio = lotacao.data_inicio ? new Date(`${lotacao.data_inicio}T12:00:00`).toLocaleDateString('pt-BR') : 'Data não informada'
-                  const fim = lotacao.data_fim ? new Date(`${lotacao.data_fim}T12:00:00`).toLocaleDateString('pt-BR') : null
-                  const atual = !lotacao.data_fim
-                  return (
-                    <div key={lotacao.id ?? `${lotacao.escola_id}-${index}`} className="relative pl-5">
-                      {index < historico.length - 1 && <span className="absolute left-[5px] top-4 bottom-[-14px] w-px bg-slate-200" />}
-                      <span className={`absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full ring-4 ring-white ${atual ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                      <div className={`p-3 rounded-2xl border ${atual ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
-                        <div className="flex items-start gap-2">
-                          <School size={15} className={`mt-0.5 shrink-0 ${atual ? 'text-emerald-600' : 'text-slate-400'}`} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="text-sm font-medium text-slate-800 leading-snug">{lotacao.escola?.name ?? 'Escola não encontrada'}</p>
-                              <Badge className={atual ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}>{atual ? 'Atual' : 'Encerrada'}</Badge>
+                {canEdit && onAddHistorico && (
+                  <button
+                    onClick={() => { onClose(); onAddHistorico(servidor) }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-violet-50 border border-violet-100 text-violet-700 text-xs font-medium hover:bg-violet-100 transition-colors"
+                  >
+                    <History size={13} /> Adicionar escola
+                  </button>
+                )}
+              </div>
+              {loadingHistorico ? (
+                <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
+              ) : historico.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <Clock size={28} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Nenhuma movimentação registrada</p>
+                  <p className="text-xs text-slate-300 mt-1">Use “Adicionar escola” para registrar uma passagem anterior.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historico.map((lotacao, index) => {
+                    const inicio = lotacao.data_inicio ? new Date(`${lotacao.data_inicio}T12:00:00`).toLocaleDateString('pt-BR') : 'Data não informada'
+                    const fim = lotacao.data_fim ? new Date(`${lotacao.data_fim}T12:00:00`).toLocaleDateString('pt-BR') : null
+                    const atual = !lotacao.data_fim
+                    return (
+                      <div key={lotacao.id ?? `${lotacao.escola_id}-${index}`} className="relative pl-5">
+                        {index < historico.length - 1 && <span className="absolute left-[5px] top-4 bottom-[-14px] w-px bg-slate-200" />}
+                        <span className={`absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full ring-4 ring-white ${atual ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                        <div className={`p-3 rounded-2xl border ${atual ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="flex items-start gap-2">
+                            <School size={15} className={`mt-0.5 shrink-0 ${atual ? 'text-emerald-600' : 'text-slate-400'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium text-slate-800 leading-snug">{lotacao.escola?.name ?? 'Escola não encontrada'}</p>
+                                <Badge className={atual ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}>{atual ? 'Atual' : 'Encerrada'}</Badge>
+                              </div>
+                              <p className="text-xs text-slate-400 mt-1">Desde {inicio}{fim ? ` até ${fim}` : ''}</p>
+                              {!atual && lotacao.motivo_saida && <p className="text-xs text-slate-500 mt-1">Motivo: {lotacao.motivo_saida}</p>}
                             </div>
-                            <p className="text-xs text-slate-400 mt-1">Desde {inicio}{fim ? ` até ${fim}` : ''}</p>
-                            {!atual && lotacao.motivo_saida && <p className="text-xs text-slate-500 mt-1">Motivo: {lotacao.motivo_saida}</p>}
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

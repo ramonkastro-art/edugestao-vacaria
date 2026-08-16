@@ -309,6 +309,23 @@ export async function transferirServidorEscola({
   return { data, error }
 }
 
+export async function adicionarHistoricoLotacao({
+  servidorId,
+  escolaId,
+  dataInicio,
+  dataFim,
+  motivo = null,
+}) {
+  const { data, error } = await supabase.rpc('adicionar_historico_lotacao', {
+    p_servidor_id: servidorId,
+    p_escola_id: Number(escolaId),
+    p_data_inicio: dataInicio,
+    p_data_fim: dataFim,
+    p_motivo: motivo?.trim() || null,
+  })
+  return { data, error }
+}
+
 export async function excluirServidor(id) {
   const { error } = await supabase.from('servidores').delete().eq('id', id)
   return { error }

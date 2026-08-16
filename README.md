@@ -85,3 +85,10 @@ Para atualizar um banco existente, faça primeiro o backup habitual do projeto n
 A aplicação inclui `public/manifest.webmanifest`, service worker e ícones PNG em 192 e 512 pixels. Em produção, o navegador poderá oferecer a instalação como aplicativo na tela inicial; o cache offline fica limitado ao shell estático da aplicação e não armazena respostas, sessões ou dados do Supabase. As consultas e o login continuam dependendo da conectividade com o backend.
 
 Depois de publicar uma nova versão, o service worker atualiza o shell automaticamente. Em ambientes com subcaminho, como GitHub Pages, ajuste `base` no `vite.config.js`, `start_url` e `scope` no manifesto para o caminho do repositório antes do deploy.
+
+
+## Edição cadastral e inclusão manual no histórico
+
+Usuários com perfil de Secretaria ou RH encontram o botão **Editar** diretamente em cada linha da tela de Servidores. A mesma ação continua disponível no detalhe, no cabeçalho, na aba Dados e no rodapé do modal. A edição altera somente os dados cadastrais informados e mantém o cadastro único do servidor.
+
+Na aba **Histórico**, o botão **Adicionar escola** registra uma passagem anterior informando escola, início, fim e motivo opcional. O vínculo é criado já encerrado, não altera a escola atual e não permite períodos sobrepostos ou duplicados. Se `migration_historico_lotacoes.sql` já tiver sido executada anteriormente, execute também `supabase/migration_historico_manual.sql`; se ainda não tiver, a função também está presente na migração principal atualizada.

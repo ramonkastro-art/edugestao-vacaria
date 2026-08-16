@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage'
 import EditarServidor from './pages/EditarServidor'
 import ServidorModal from './components/ServidorModal'
 import TransferirLotacaoModal from './components/TransferirLotacaoModal'
+import AdicionarHistoricoLotacaoModal from './components/AdicionarHistoricoLotacaoModal'
 import {
   useEscolas, useServidores, useServidoresByEscola,
   useEfetividade, useDashboardStats, buscarGlobal,
@@ -350,7 +351,7 @@ function SchoolQuadro({ escola, onBack, onOpenServidor }) {
 
 // ─── SERVIDORES LIST ─────────────────────────────────────────────────────────
 
-function ServidoresList({ onOpenServidor, onNovoServidor }) {
+function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit }) {
   const {servidores,loading,reload}=useServidores()
   const {escolas}=useEscolas()
   const [search,setSearch]=useState('')
@@ -419,6 +420,16 @@ function ServidoresList({ onOpenServidor, onNovoServidor }) {
                 </div>
                 <p className="text-xs text-slate-400 truncate mt-0.5">{escNomes.join(' · ')||'Sem escola vinculada'}</p>
               </div>
+              {canEdit && (
+                <button
+                  onClick={event => { event.stopPropagation(); onEdit(s) }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors shrink-0"
+                  title="Editar dados do servidor"
+                  aria-label={`Editar dados de ${s.nome}`}
+                >
+                  <Edit2 size={14}/><span className="hidden sm:inline">Editar</span>
+                </button>
+              )}
               <ChevronRight size={16} className="text-slate-300 shrink-0"/>
             </div>
           )
@@ -503,6 +514,7 @@ export default function App() {
   const [selectedSchool,setSelectedSchool]=useState(null)
   const [selectedServidor,setSelectedServidor]=useState(null)
   const [transferServidor,setTransferServidor]=useState(null)
+  const [historicoServidor,setHistoricoServidor]=useState(null)
   const [editServidor,setEditServidor]=useState(null)
   const [isNovo,setIsNovo]=useState(false)
   const [searchOpen,setSearchOpen]=useState(false)
@@ -595,7 +607,7 @@ export default function App() {
           {view==='dashboard'&&<Dashboard onSelectSchool={handleSelectSchool}/>}
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
-          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor}/>}
+          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={admin}/>}
           {view==='efe'&&<EfeModule onOpenServidor={setSelectedServidor}/>}
           {view==='relatorios'&&<div className="flex items-center justify-center h-64 text-slate-400"><div className="text-center"><FileText size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Relatórios · em breve</p></div></div>}
         </main>
@@ -611,6 +623,7 @@ export default function App() {
           onClose={()=>setSelectedServidor(null)}
           onEdit={admin?openEditServidor:null}
           onTransfer={admin ? (srv => { setSelectedServidor(null); setTransferServidor(srv) }) : null}
+          onAddHistorico={admin ? (srv => { setSelectedServidor(null); setHistoricoServidor(srv) }) : null}
           canEdit={admin}
         />
       )}
@@ -620,6 +633,15 @@ export default function App() {
           servidor={transferServidor}
           escolas={escolas}
           onClose={()=>setTransferServidor(null)}
+          onSuccess={()=>reloadServidores()}
+        />
+      )}
+
+      {historicoServidor&&(
+        <AdicionarHistoricoLotacaoModal
+          servidor={historicoServidor}
+          escolas={escolas}
+          onClose={()=>setHistoricoServidor(null)}
           onSuccess={()=>reloadServidores()}
         />
       )}
