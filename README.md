@@ -92,3 +92,8 @@ Depois de publicar uma nova versão, o service worker atualiza o shell automatic
 Usuários com perfil de Secretaria ou RH encontram o botão **Editar** diretamente em cada linha da tela de Servidores. A mesma ação continua disponível no detalhe, no cabeçalho, na aba Dados e no rodapé do modal. A edição altera somente os dados cadastrais informados e mantém o cadastro único do servidor.
 
 Na aba **Histórico**, o botão **Adicionar escola** registra uma passagem anterior informando escola, início, fim e motivo opcional. O vínculo é criado já encerrado, não altera a escola atual e não permite períodos sobrepostos ou duplicados. Se `migration_historico_lotacoes.sql` já tiver sido executada anteriormente, execute também `supabase/migration_historico_manual.sql`; se ainda não tiver, a função também está presente na migração principal atualizada.
+
+
+## Diagnóstico de listagem e publicação
+
+Se a busca superior encontrar servidores, mas as telas **Servidores** e **Quadro por Escola** ficarem vazias, a causa mais provável é a migração de histórico ainda não executada. A versão atual tenta o schema compatível e mostra o erro quando a falha é de permissão. Execute `supabase/migration_historico_lotacoes.sql` e `supabase/migration_historico_manual.sql` no Supabase, confirme que o usuário tem uma linha em `user_profiles` com role `secretaria` ou `rh` para editar e publique novamente. Após o deploy, faça hard refresh ou limpe o cache do site para carregar o service worker `shell-v2`.

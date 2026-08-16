@@ -153,11 +153,12 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
       const res = await criarServidor(form, escolasSel)
       error = res.error
     } else {
-      const [r1, r2] = await Promise.all([
-        atualizarServidor(servidor.id, form),
-        atualizarLotacoes(servidor.id, escolasSel),
-      ])
-      error = r1.error ?? r2.error
+      const r1 = await atualizarServidor(servidor.id, form)
+      error = r1.error
+      if (!error && lotacoesMudaram) {
+        const r2 = await atualizarLotacoes(servidor.id, escolasSel)
+        error = r2.error
+      }
     }
 
     setSaving(false)
@@ -180,6 +181,9 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   const escolasVinculadas  = escolasSel
     .map(id => escolas.find(e => String(e.id) === id))
     .filter(Boolean)
+  const escolasOriginais = (servidor?.lotacoes ?? []).map(lotacao => String(lotacao.escola_id)).sort()
+  const escolasAtuaisOrdenadas = [...escolasSel].sort()
+  const lotacoesMudaram = JSON.stringify(escolasOriginais) !== JSON.stringify(escolasAtuaisOrdenadas)
 
   const TIPO_COLORS = {
     EMEI: 'bg-violet-50 text-violet-700 border-violet-200',

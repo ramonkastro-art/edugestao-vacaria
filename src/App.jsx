@@ -58,6 +58,21 @@ function AvatarCircle({ name='', size='md' }) {
 function Spinner() {
   return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-slate-400"/></div>
 }
+function DataBanner({ error, migrationWarning }) {
+  if (error) return (
+    <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-sm text-red-700">
+      <p className="font-medium">Não foi possível carregar estes dados.</p>
+      <p className="text-xs mt-1 text-red-600 break-words">{error}</p>
+    </div>
+  )
+  if (migrationWarning) return (
+    <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-800">
+      <p className="font-medium">Dados carregados em modo compatível.</p>
+      <p className="text-xs mt-1 text-amber-700">A listagem funciona, mas o histórico e a transferência dependem da execução das migrações do Supabase.</p>
+    </div>
+  )
+  return null
+}
 function RoleBadge({ role }) {
   const map = {
     secretaria:{l:'Secretaria',c:'bg-violet-50 text-violet-700 border-violet-200'},
@@ -74,13 +89,13 @@ function isAdmin(profile) {
 
 // ─── BOTTOM NAV MOBILE ───────────────────────────────────────────────────────
 
-function BottomNav({ currentView, onNavigate }) {
+function BottomNav({ currentView, onNavigate, canCreate }) {
   const items = [
     {id:'dashboard', label:'Início',    icon:Home},
     {id:'schools',   label:'Unidades', icon:School},
     {id:'servidores',label:'Servidores',icon:Users},
     {id:'efe',       label:'EFE',      icon:CheckCircle2},
-    {id:'novo',      label:'Novo',     icon:UserPlus},
+    ...(canCreate ? [{id:'novo', label:'Novo', icon:UserPlus}] : []),
   ]
   const activeId = currentView==='school-detail'?'schools':currentView
   return (
@@ -101,6 +116,7 @@ function BottomNav({ currentView, onNavigate }) {
 function SearchOverlay({ onClose, onSelectSchool, onOpenServidor }) {
   const [query,setQuery] = useState('')
   const [results,setResults] = useState({servidores:[],escolas:[]})
+  const [searchError,setSearchError] = useState('')
   const [searching,setSearching] = useState(false)
 
   useEffect(()=>{
@@ -110,11 +126,17 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenServidor }) {
   },[onClose])
 
   useEffect(()=>{
-    if(query.length<2){setResults({servidores:[],escolas:[]});return}
+    if(query.length<2){setResults({servidores:[],escolas:[]});setSearchError('');return}
     setSearching(true)
     const t=setTimeout(async()=>{
-      try{const r=await buscarGlobal(query);setResults(r??{servidores:[],escolas:[]})}
-      catch(_){setResults({servidores:[],escolas:[]})}
+      try {
+        const r=await buscarGlobal(query)
+        setResults(r??{servidores:[],escolas:[]})
+        setSearchError(r?.error || '')
+      } catch (error) {
+        setResults({servidores:[],escolas:[]})
+        setSearchError(error?.message || 'Não foi possível realizar a busca.')
+      }
       finally{setSearching(false)}
     },300)
     return()=>clearTimeout(t)
@@ -134,7 +156,8 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenServidor }) {
                :<button onClick={onClose} className="text-xs text-slate-400 px-2 py-1 hover:bg-slate-100 rounded-lg">Fechar</button>}
         </div>
         <div className="max-h-[60vh] overflow-y-auto">
-          {query.length>=2&&!searching&&total===0&&(
+          {searchError&&<div className="mx-4 mt-3 p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700">{searchError}</div>}
+          {query.length>=2&&!searching&&total===0&&!searchError&&(
             <div className="px-4 py-8 text-center">
               <p className="text-sm text-slate-400">Nenhum resultado para "{query}"</p>
               <p className="text-xs text-slate-300 mt-1">Tente partes do nome: "Ana Velho"</p>
@@ -182,8 +205,8 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenServidor }) {
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 
 function Dashboard({ onSelectSchool }) {
-  const {stats,loading}=useDashboardStats()
-  const {escolas}=useEscolas()
+  const {stats,loading,error:statsError,migrationWarning:statsMigrationWarning}=useDashboardStats()
+  const {escolas,error:escolasError}=useEscolas()
   if(loading)return<Spinner/>
   return (
     <div className="space-y-6">
@@ -191,6 +214,7 @@ function Dashboard({ onSelectSchool }) {
         <h1 className="text-xl font-semibold text-slate-900">Visão Geral</h1>
         <p className="text-sm text-slate-500 mt-1">Rede Municipal · Vacaria–RS · {mesAnoLabel(mesAnoAtual())}</p>
       </div>
+      <DataBanner error={statsError || escolasError} migrationWarning={statsMigrationWarning}/>
       <div className="grid grid-cols-2 gap-3">
         {[
           {label:'Escolas',     val:stats?.totalEscolas,    icon:School,        bg:'bg-slate-50',  text:'text-slate-800',  ib:'bg-slate-200 text-slate-600'},
@@ -242,7 +266,7 @@ function Dashboard({ onSelectSchool }) {
 // ─── SCHOOLS GRID ────────────────────────────────────────────────────────────
 
 function SchoolsGrid({ onSelectSchool }) {
-  const {escolas,loading}=useEscolas()
+  const {escolas,loading,error}=useEscolas()
   const [tipoFiltro,setTipoFiltro]=useState('Todos')
   const [search,setSearch]=useState('')
   const filtered=useMemo(()=>escolas.filter(s=>(tipoFiltro==='Todos'||s.tipo===tipoFiltro)&&(search===''||s.name.toLowerCase().includes(search.toLowerCase()))),[escolas,tipoFiltro,search])
@@ -250,6 +274,7 @@ function SchoolsGrid({ onSelectSchool }) {
   return (
     <div className="space-y-5">
       <div><h1 className="text-xl font-semibold text-slate-900">Unidades Escolares</h1><p className="text-sm text-slate-500 mt-0.5">{escolas.length} unidades · Rede Municipal</p></div>
+      <DataBanner error={error}/>
       <div className="space-y-2">
         <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
           <Search size={15} className="text-slate-400"/>
@@ -287,7 +312,7 @@ function SchoolsGrid({ onSelectSchool }) {
 // ─── SCHOOL QUADRO ───────────────────────────────────────────────────────────
 
 function SchoolQuadro({ escola, onBack, onOpenServidor }) {
-  const {servidores,loading,reload}=useServidoresByEscola(escola.id)
+  const {servidores,loading,reload,error,migrationWarning}=useServidoresByEscola(escola.id)
   const {efe,salvarEfe,saving}=useEfetividade(escola.id,mesAnoAtual())
   const [search,setSearch]=useState('')
   const filtered=useMemo(()=>servidores.filter(s=>search===''||s.nome.toLowerCase().includes(search.toLowerCase())),[servidores,search])
@@ -309,6 +334,7 @@ function SchoolQuadro({ escola, onBack, onOpenServidor }) {
           <RefreshCw size={15} className="text-slate-400"/>
         </button>
       </div>
+      <DataBanner error={error} migrationWarning={migrationWarning}/>
       <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
         <Search size={15} className="text-slate-400"/>
         <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
@@ -351,8 +377,8 @@ function SchoolQuadro({ escola, onBack, onOpenServidor }) {
 
 // ─── SERVIDORES LIST ─────────────────────────────────────────────────────────
 
-function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit }) {
-  const {servidores,loading,reload}=useServidores()
+function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refreshToken }) {
+  const {servidores,loading,reload,error,migrationWarning}=useServidores()
   const {escolas}=useEscolas()
   const [search,setSearch]=useState('')
   const [deb,setDeb]=useState('')
@@ -360,6 +386,7 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit }) {
   const [statusFiltro,setStatusFiltro]=useState('Ativo')
 
   useEffect(()=>{const t=setTimeout(()=>setDeb(search),250);return()=>clearTimeout(t)},[search])
+  useEffect(()=>{if(refreshToken>0)reload()},[refreshToken,reload])
 
   const filtered=useMemo(()=>{
     const q=deb.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
@@ -383,6 +410,8 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit }) {
           </button>
         </div>
       </div>
+      <DataBanner error={error} migrationWarning={migrationWarning}/>
+      {!canEdit && <div className="p-3 bg-slate-100 border border-slate-200 rounded-2xl text-xs text-slate-600">Seu perfil está em modo de consulta. A edição de servidores e vínculos exige role <strong>secretaria</strong> ou <strong>rh</strong> no Supabase.</div>}
       <div className="space-y-2">
         <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
           <Search size={15} className="text-slate-400"/>
@@ -442,12 +471,12 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit }) {
 // ─── EFE MODULE ──────────────────────────────────────────────────────────────
 
 function EfeModule({ onOpenServidor }) {
-  const {servidores,loading}=useServidores()
-  const {escolas}=useEscolas()
+  const {servidores,loading,error:servidoresError,migrationWarning}=useServidores()
+  const {escolas,error:escolasError}=useEscolas()
   const [escolaFiltro,setEscolaFiltro]=useState('')
   const [search,setSearch]=useState('')
   const escolaSel=useMemo(()=>escolas.find(e=>String(e.id)===escolaFiltro),[escolas,escolaFiltro])
-  const {efe,salvarEfe,saving}=useEfetividade(escolaSel?.id,mesAnoAtual())
+  const {efe,salvarEfe,saving,error:efeError}=useEfetividade(escolaSel?.id,mesAnoAtual())
   const filtered=useMemo(()=>{
     const q=search.toLowerCase()
     return servidores.filter(s=>
@@ -459,6 +488,7 @@ function EfeModule({ onOpenServidor }) {
   return (
     <div className="space-y-5">
       <div><h1 className="text-xl font-semibold text-slate-900">Efetividade — EFE</h1><p className="text-sm text-slate-500 mt-0.5">Registro mensal · {mesAnoLabel(mesAnoAtual())}</p></div>
+      <DataBanner error={servidoresError || escolasError || efeError} migrationWarning={migrationWarning}/>
       <div className="space-y-2">
         <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)}
           className="w-full px-3 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
@@ -507,7 +537,7 @@ function EfeModule({ onOpenServidor }) {
 // ─── APP SHELL ───────────────────────────────────────────────────────────────
 
 export default function App() {
-  const {user,profile,loading,signOut}=useAuth()
+  const {user,profile,loading,profileLoading,profileError,signOut}=useAuth()
   const admin=isAdmin(profile)
   const {escolas}=useEscolas()
   const [view,setView]=useState('dashboard')
@@ -519,6 +549,7 @@ export default function App() {
   const [isNovo,setIsNovo]=useState(false)
   const [searchOpen,setSearchOpen]=useState(false)
   const [sidebarOpen,setSidebarOpen]=useState(true)
+  const [dataVersion,setDataVersion]=useState(0)
   const {servidores:allServidores,reload:reloadServidores}=useServidores()
 
   useEffect(()=>{
@@ -536,6 +567,10 @@ export default function App() {
     // Busca dados completos se vieram da busca (poucos campos)
     const completo = allServidores.find(s=>s.id===srv.id)??srv
     setIsNovo(false);setEditServidor(completo);setSelectedServidor(null)
+  }
+  function handleDataChanged(){
+    setDataVersion(version => version + 1)
+    reloadServidores()
   }
 
   const navItems=[
@@ -604,16 +639,22 @@ export default function App() {
           </div>
         </header>
         <main className="flex-1 p-4 sm:p-6 pb-24 md:pb-6 max-w-5xl w-full">
+          {!profileLoading && !profile && user && (
+            <div className="mb-5 p-3 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-800">
+              <p className="font-medium">Perfil de acesso não encontrado.</p>
+              <p className="text-xs mt-1">A visualização pode funcionar, mas os botões de edição ficam bloqueados. Crie ou ajuste o registro deste usuário em `user_profiles` no Supabase. {profileError && `Detalhe: ${profileError}`}</p>
+            </div>
+          )}
           {view==='dashboard'&&<Dashboard onSelectSchool={handleSelectSchool}/>}
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
-          {view==='school-detail'&&selectedSchool&&<SchoolQuadro escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
-          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={admin}/>}
+          {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
+          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={admin} refreshToken={dataVersion}/>}
           {view==='efe'&&<EfeModule onOpenServidor={setSelectedServidor}/>}
           {view==='relatorios'&&<div className="flex items-center justify-center h-64 text-slate-400"><div className="text-center"><FileText size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Relatórios · em breve</p></div></div>}
         </main>
       </div>
 
-      <BottomNav currentView={view} onNavigate={navigate}/>
+      <BottomNav currentView={view} onNavigate={navigate} canCreate={admin}/>
 
       {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenServidor={s=>setSelectedServidor(s)}/>}
 
@@ -633,7 +674,7 @@ export default function App() {
           servidor={transferServidor}
           escolas={escolas}
           onClose={()=>setTransferServidor(null)}
-          onSuccess={()=>reloadServidores()}
+          onSuccess={handleDataChanged}
         />
       )}
 
@@ -642,7 +683,7 @@ export default function App() {
           servidor={historicoServidor}
           escolas={escolas}
           onClose={()=>setHistoricoServidor(null)}
-          onSuccess={()=>reloadServidores()}
+          onSuccess={handleDataChanged}
         />
       )}
 
@@ -652,8 +693,8 @@ export default function App() {
           isNovo={isNovo}
           escolas={escolas}
           onClose={()=>{setEditServidor(null);setIsNovo(false)}}
-          onSaved={()=>{reloadServidores();setEditServidor(null);setIsNovo(false)}}
-          onDeleted={()=>{reloadServidores();setEditServidor(null);setSelectedServidor(null)}}
+          onSaved={()=>{handleDataChanged();setEditServidor(null);setIsNovo(false)}}
+          onDeleted={()=>{handleDataChanged();setEditServidor(null);setSelectedServidor(null)}}
         />
       )}
     </div>

@@ -26,6 +26,7 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
   const [loadingCadastro, setLoadingCadastro] = useState(false)
   const [historico, setHistorico] = useState([])
   const [loadingHistorico, setLoadingHistorico] = useState(false)
+  const [historicoError, setHistoricoError] = useState('')
 
   if (!servidor) return null
 
@@ -47,13 +48,15 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
   useEffect(() => {
     if (tab !== 'historico') return
     setLoadingHistorico(true)
+    setHistoricoError('')
     supabase
       .from('lotacoes')
       .select('id, escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo)')
       .eq('servidor_id', servidor.id)
       .order('data_inicio', { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         setHistorico(data ?? [])
+        setHistoricoError(error?.message || '')
         setLoadingHistorico(false)
       })
   }, [tab, servidor.id])
@@ -280,6 +283,10 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
               </div>
               {loadingHistorico ? (
                 <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
+              ) : historicoError ? (
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-800">
+                  O histórico detalhado ainda não está disponível. Execute a migração `migration_historico_lotacoes.sql` no Supabase.
+                </div>
               ) : historico.length === 0 ? (
                 <div className="text-center py-10 text-slate-400">
                   <Clock size={28} className="mx-auto mb-2 opacity-30" />
