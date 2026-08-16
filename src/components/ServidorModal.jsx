@@ -20,10 +20,12 @@ function Badge({ children, className = '' }) {
   return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${className}`}>{children}</span>
 }
 
-export default function ServidorModal({ servidor, onClose, onEdit, canEdit }) {
+export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, canEdit }) {
   const [tab, setTab] = useState('escola') // 'escola' | 'dados' | 'historico'
   const [cadastro, setCadastro] = useState(null)
   const [loadingCadastro, setLoadingCadastro] = useState(false)
+  const [historico, setHistorico] = useState([])
+  const [loadingHistorico, setLoadingHistorico] = useState(false)
 
   if (!servidor) return null
 
@@ -41,6 +43,20 @@ export default function ServidorModal({ servidor, onClose, onEdit, canEdit }) {
       .single()
       .then(({ data }) => { setCadastro(data); setLoadingCadastro(false) })
   }, [tab, servidor.id, cadastro])
+
+  useEffect(() => {
+    if (tab !== 'historico') return
+    setLoadingHistorico(true)
+    supabase
+      .from('lotacoes')
+      .select('id, escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo)')
+      .eq('servidor_id', servidor.id)
+      .order('data_inicio', { ascending: false })
+      .then(({ data }) => {
+        setHistorico(data ?? [])
+        setLoadingHistorico(false)
+      })
+  }, [tab, servidor.id])
 
   const dadosBase = cadastro ?? servidor
 
@@ -81,11 +97,22 @@ export default function ServidorModal({ servidor, onClose, onEdit, canEdit }) {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {canEdit && onTransfer && (
+                <button
+                  onClick={() => { onClose(); onTransfer(servidor) }}
+                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
+                  title="Transferir de escola"
+                  aria-label="Transferir de escola"
+                >
+                  <ArrowRightLeft size={15} className="text-white" />
+                </button>
+              )}
               {canEdit && (
                 <button
                   onClick={() => { onClose(); onEdit(servidor) }}
                   className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
                   title="Editar"
+                  aria-label="Editar cadastro"
                 >
                   <Edit2 size={15} className="text-white" />
                 </button>
@@ -229,20 +256,60 @@ export default function ServidorModal({ servidor, onClose, onEdit, canEdit }) {
 
           {/* ABA: Histórico */}
           {tab === 'historico' && (
-            <div className="text-center py-10 text-slate-400">
-              <Clock size={28} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Histórico de movimentações</p>
-              <p className="text-xs text-slate-300 mt-1">Em desenvolvimento</p>
-            </div>
+            loadingHistorico ? (
+              <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
+            ) : historico.length === 0 ? (
+              <div className="text-center py-10 text-slate-400">
+                <Clock size={28} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Nenhuma movimentação registrada</p>
+                <p className="text-xs text-slate-300 mt-1">As próximas transferências aparecerão aqui.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Histórico de lotações</p>
+                {historico.map((lotacao, index) => {
+                  const inicio = lotacao.data_inicio ? new Date(`${lotacao.data_inicio}T12:00:00`).toLocaleDateString('pt-BR') : 'Data não informada'
+                  const fim = lotacao.data_fim ? new Date(`${lotacao.data_fim}T12:00:00`).toLocaleDateString('pt-BR') : null
+                  const atual = !lotacao.data_fim
+                  return (
+                    <div key={lotacao.id ?? `${lotacao.escola_id}-${index}`} className="relative pl-5">
+                      {index < historico.length - 1 && <span className="absolute left-[5px] top-4 bottom-[-14px] w-px bg-slate-200" />}
+                      <span className={`absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full ring-4 ring-white ${atual ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                      <div className={`p-3 rounded-2xl border ${atual ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                        <div className="flex items-start gap-2">
+                          <School size={15} className={`mt-0.5 shrink-0 ${atual ? 'text-emerald-600' : 'text-slate-400'}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-medium text-slate-800 leading-snug">{lotacao.escola?.name ?? 'Escola não encontrada'}</p>
+                              <Badge className={atual ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}>{atual ? 'Atual' : 'Encerrada'}</Badge>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">Desde {inicio}{fim ? ` até ${fim}` : ''}</p>
+                            {!atual && lotacao.motivo_saida && <p className="text-xs text-slate-500 mt-1">Motivo: {lotacao.motivo_saida}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
           )}
         </div>
 
         {/* Footer actions */}
         {canEdit && (
-          <div className="px-5 py-4 border-t border-slate-100 shrink-0">
+          <div className="px-5 py-4 border-t border-slate-100 shrink-0 flex gap-2">
+            {onTransfer && (
+              <button
+                onClick={() => { onClose(); onTransfer(servidor) }}
+                className="flex items-center justify-center gap-2 px-3 py-3 border border-blue-200 text-blue-700 bg-blue-50 rounded-2xl text-sm font-medium hover:bg-blue-100 active:scale-95 transition-all"
+              >
+                <ArrowRightLeft size={14} /> <span className="hidden sm:inline">Transferir</span>
+              </button>
+            )}
             <button
               onClick={() => { onClose(); onEdit(servidor) }}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 active:scale-95 transition-all"
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 active:scale-95 transition-all"
             >
               <Edit2 size={14} /> Editar cadastro
             </button>

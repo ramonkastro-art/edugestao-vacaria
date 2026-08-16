@@ -305,6 +305,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
             {/* Escolas vinculadas como tags */}
             <div>
               <FieldLabel>Escola(s) de lotação</FieldLabel>
+              {!isNovo && <p className="text-xs text-slate-400 mb-2">Remover uma escola encerra o vínculo e preserva o registro no histórico. Para uma mudança de unidade, prefira <strong className="font-medium text-slate-500">Transferir</strong>.</p>}
 
               {escolasVinculadas.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">

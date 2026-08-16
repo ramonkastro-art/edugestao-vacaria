@@ -3,13 +3,14 @@ import {
   Search, School, Users, Home, FileText, LogOut,
   CheckCircle2, AlertCircle, X, Menu, ChevronRight,
   GraduationCap, Briefcase, Loader2, RefreshCw, Shield,
-  UserPlus, Edit2, Filter,
+  UserPlus, Edit2, Filter, ArrowRightLeft,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import EditarServidor from './pages/EditarServidor'
 import ServidorModal from './components/ServidorModal'
+import TransferirLotacaoModal from './components/TransferirLotacaoModal'
 import {
   useEscolas, useServidores, useServidoresByEscola,
   useEfetividade, useDashboardStats, buscarGlobal,
@@ -501,6 +502,7 @@ export default function App() {
   const [view,setView]=useState('dashboard')
   const [selectedSchool,setSelectedSchool]=useState(null)
   const [selectedServidor,setSelectedServidor]=useState(null)
+  const [transferServidor,setTransferServidor]=useState(null)
   const [editServidor,setEditServidor]=useState(null)
   const [isNovo,setIsNovo]=useState(false)
   const [searchOpen,setSearchOpen]=useState(false)
@@ -608,7 +610,17 @@ export default function App() {
           servidor={selectedServidor}
           onClose={()=>setSelectedServidor(null)}
           onEdit={admin?openEditServidor:null}
+          onTransfer={admin ? (srv => { setSelectedServidor(null); setTransferServidor(srv) }) : null}
           canEdit={admin}
+        />
+      )}
+
+      {transferServidor&&(
+        <TransferirLotacaoModal
+          servidor={transferServidor}
+          escolas={escolas}
+          onClose={()=>setTransferServidor(null)}
+          onSuccess={()=>reloadServidores()}
         />
       )}
 

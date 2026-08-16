@@ -7,6 +7,21 @@ export function normStr(s) {
   return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
 }
 
+function somenteLotacoesAtuais(servidores = []) {
+  return servidores.map(servidor => ({
+    ...servidor,
+    lotacoes: (servidor.lotacoes ?? []).filter(lotacao => !lotacao.data_fim),
+  }))
+}
+
+export function hojeISO() {
+  const agora = new Date()
+  const ano = agora.getFullYear()
+  const mes = String(agora.getMonth() + 1).padStart(2, '0')
+  const dia = String(agora.getDate()).padStart(2, '0')
+  return `${ano}-${mes}-${dia}`
+}
+
 // ─── ESCOLAS ─────────────────────────────────────────────────────────────────
 
 export function useEscolas() {
@@ -33,11 +48,11 @@ export function useServidores() {
         id, nome, nome_norm, status, funcao, tipo_vinculo,
         matricula, email, telefone, data_nascimento,
         endereco, formacao, regencia_h, htp_h, hti_h, observacoes,
-        lotacoes ( escola_id, principal, escola:escolas(id, name, tipo) )
+        lotacoes ( escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo) )
       `)
       .order('nome')
     if (error) console.error('useServidores:', error)
-    setServidores(data ?? [])
+    setServidores(somenteLotacoesAtuais(data ?? []))
     setLoading(false)
   }, [])
 
@@ -60,11 +75,11 @@ export function useServidor(id) {
         id, nome, nome_norm, status, funcao, tipo_vinculo,
         matricula, email, telefone, data_nascimento,
         endereco, formacao, regencia_h, htp_h, hti_h, observacoes,
-        lotacoes ( escola_id, principal, escola:escolas(id, name, tipo) )
+        lotacoes ( escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo) )
       `)
       .eq('id', id)
       .single()
-    setServidor(data)
+    setServidor(data ? somenteLotacoesAtuais([data])[0] : null)
     setLoading(false)
   }, [id])
 
@@ -87,13 +102,18 @@ export function useServidoresByEscola(escolaId) {
         escola_id, principal,
         servidor:servidores (
           id, nome, status, funcao, tipo_vinculo, matricula,
-          lotacoes ( escola:escolas(id, name, tipo) )
+          lotacoes ( escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo) )
         )
       `)
       .eq('escola_id', escolaId)
+      .is('data_fim', null)
     setServidores(
       (data ?? [])
-        .map(l => l.servidor ? { ...l.servidor, lotacaoAtual: l } : null)
+        .map(l => l.servidor ? {
+          ...l.servidor,
+          lotacoes: (l.servidor.lotacoes ?? []).filter(lotacao => !lotacao.data_fim),
+          lotacaoAtual: l,
+        } : null)
         .filter(Boolean)
         .sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     )
@@ -154,7 +174,7 @@ export function useDashboardStats() {
       ] = await Promise.all([
         supabase.from('servidores').select('*', { count: 'exact', head: true }),
         supabase.from('escolas').select('*', { count: 'exact', head: true }),
-        supabase.from('lotacoes').select('servidor_id, escola_id'),
+        supabase.from('lotacoes').select('servidor_id, escola_id').is('data_fim', null),
       ])
       const byServ = {}
       ;(lots ?? []).forEach(l => {
@@ -201,7 +221,10 @@ export async function buscarGlobal(query) {
   ])
 
   return {
-    servidores: (servsRaw ?? []).filter(s => matchAll(s.nome)).slice(0, 12),
+    servidores: (servsRaw ?? [])
+      .map(s => ({ ...s, lotacoes: (s.lotacoes ?? []).filter(lotacao => !lotacao.data_fim) }))
+      .filter(s => matchAll(s.nome))
+      .slice(0, 12),
     escolas: escolasRaw ?? [],
   }
 }
@@ -260,17 +283,30 @@ export async function atualizarServidor(id, dados) {
   return { error }
 }
 
-export async function atualizarLotacoes(servidorId, escolaIds = []) {
-  await supabase.from('lotacoes').delete().eq('servidor_id', servidorId)
-  if (!escolaIds.length) return { error: null }
-  const { error } = await supabase.from('lotacoes').insert(
-    escolaIds.map((eid, i) => ({
-      servidor_id: servidorId,
-      escola_id:   parseInt(eid),
-      principal:   i === 0,
-    }))
-  )
-  return { error }
+export async function atualizarLotacoes(servidorId, escolaIds = [], dataReferencia = hojeISO()) {
+  const { data, error } = await supabase.rpc('sincronizar_lotacoes', {
+    p_servidor_id: servidorId,
+    p_escola_ids: escolaIds.map(id => Number(id)).filter(Number.isInteger),
+    p_data_referencia: dataReferencia,
+  })
+  return { data, error }
+}
+
+export async function transferirServidorEscola({
+  servidorId,
+  escolaOrigemId,
+  escolaDestinoId,
+  dataTransferencia = hojeISO(),
+  motivo = null,
+}) {
+  const { data, error } = await supabase.rpc('transferir_servidor_escola', {
+    p_servidor_id: servidorId,
+    p_escola_origem_id: Number(escolaOrigemId),
+    p_escola_destino_id: Number(escolaDestinoId),
+    p_data_transferencia: dataTransferencia,
+    p_motivo: motivo?.trim() || null,
+  })
+  return { data, error }
 }
 
 export async function excluirServidor(id) {

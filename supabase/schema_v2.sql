@@ -52,12 +52,17 @@ CREATE TABLE IF NOT EXISTS lotacoes (
   servidor_id  UUID NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
   escola_id    INTEGER NOT NULL REFERENCES escolas(id) ON DELETE CASCADE,
   principal    BOOLEAN DEFAULT false,
+  data_inicio  DATE NOT NULL DEFAULT CURRENT_DATE,
+  data_fim     DATE,
+  motivo_saida TEXT,
   created_at   TIMESTAMPTZ DEFAULT now(),
-  UNIQUE (servidor_id, escola_id)
+  updated_at   TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_lotacoes_servidor ON lotacoes(servidor_id);
 CREATE INDEX IF NOT EXISTS idx_lotacoes_escola   ON lotacoes(escola_id);
+CREATE INDEX IF NOT EXISTS idx_lotacoes_historico_servidor ON lotacoes(servidor_id, data_inicio DESC, data_fim DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS lotacoes_ativas_unicas_idx ON lotacoes(servidor_id, escola_id) WHERE data_fim IS NULL;
 
 -- ─── 4. EFETIVIDADE ──────────────────────────────────────────────────────────
 

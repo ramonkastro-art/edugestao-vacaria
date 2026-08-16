@@ -65,3 +65,23 @@ Os dados reais estão em `src/data/data.json` — 614 professores e 30 escolas d
 ## Regra de negócio crítica
 
 Professores com 2 nomeações (mesma ou escolas diferentes) possuem **um único cadastro** — a duplicidade está nos vínculos, não na pessoa.
+
+
+## Histórico de lotações e transferência
+
+O sistema mantém um único cadastro por servidor e agora registra a trajetória escolar na própria tabela `lotacoes`. Uma lotação ativa possui `data_fim` nula; quando o vínculo é encerrado ou transferido, ele permanece no banco com `data_fim` e `motivo_saida`, enquanto a nova escola é registrada como uma nova lotação ativa. O botão **Transferir** fica disponível no detalhe do servidor para usuários com permissão de Secretaria ou RH e abre um fluxo com escola de origem, destino, data e motivo opcional.
+
+Para atualizar um banco existente, faça primeiro o backup habitual do projeto no Supabase e execute o arquivo `supabase/migration_historico_lotacoes.sql` no SQL Editor. A migração adiciona colunas, índices e funções transacionais sem apagar lotações existentes. O arquivo `supabase/schema_v2.sql` também foi atualizado para que instalações novas já nasçam com o modelo histórico.
+
+| Operação | Resultado no histórico |
+| --- | --- |
+| Transferir para outra escola | Encerra o vínculo atual e cria o novo vínculo com a data informada. |
+| Remover uma escola no cadastro | Encerra a lotação preservando o registro anterior. |
+| Adicionar outra escola | Cria uma nova lotação ativa sem duplicar o cadastro do servidor. |
+| Consultar o perfil | A aba **Histórico** mostra vínculos atuais e encerrados do mais recente ao mais antigo. |
+
+## Progressive Web App
+
+A aplicação inclui `public/manifest.webmanifest`, service worker e ícones PNG em 192 e 512 pixels. Em produção, o navegador poderá oferecer a instalação como aplicativo na tela inicial; o cache offline fica limitado ao shell estático da aplicação e não armazena respostas, sessões ou dados do Supabase. As consultas e o login continuam dependendo da conectividade com o backend.
+
+Depois de publicar uma nova versão, o service worker atualiza o shell automaticamente. Em ambientes com subcaminho, como GitHub Pages, ajuste `base` no `vite.config.js`, `start_url` e `scope` no manifesto para o caminho do repositório antes do deploy.
