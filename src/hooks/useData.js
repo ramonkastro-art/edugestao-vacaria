@@ -242,7 +242,7 @@ export function useDashboardStats() {
     async function load() {
       const [servidoresResult, escolasResult, lotacoesResult] = await Promise.all([
         supabase.from('servidores').select('*', { count: 'exact', head: true }),
-        supabase.from('escolas').select('*', { count: 'exact', head: true }),
+        supabase.from('escolas').select('*', { count: 'exact', head: true }).neq('tipo', 'SMED'),
         supabase.from('lotacoes').select('servidor_id, escola_id').is('data_fim', null),
       ])
 
