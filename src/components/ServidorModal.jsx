@@ -69,7 +69,7 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
       onClick={onClose}
     >
       <div
-        className="bg-white w-full md:max-w-md md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        className="bg-white w-full md:max-w-md md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Drag handle mobile */}
@@ -146,7 +146,7 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3">
 
           {/* ABA: Escola */}
           {tab === 'escola' && (
@@ -327,7 +327,7 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
 
         {/* Footer actions */}
         {canEdit && (
-          <div className="px-5 py-4 border-t border-slate-100 shrink-0 flex gap-2">
+          <div className="modal-footer-safe px-4 sm:px-5 py-4 border-t border-slate-100 shrink-0 flex flex-col sm:flex-row gap-2">
             {onTransfer && (
               <button
                 onClick={() => { onClose(); onTransfer(servidor) }}

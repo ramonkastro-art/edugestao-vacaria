@@ -66,7 +66,7 @@ export default function AdicionarHistoricoLotacaoModal({ servidor, escolas = [],
 
   return (
     <div className="fixed inset-0 z-[75] flex items-end md:items-center justify-center bg-slate-950/30 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <div className="bg-white w-full md:max-w-md rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden" onClick={event => event.stopPropagation()}>
+      <div className="bg-white w-full md:max-w-md max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={event => event.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1 md:hidden"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
 
         <div className="flex items-start gap-3 px-5 py-4 border-b border-slate-100">
@@ -82,7 +82,7 @@ export default function AdicionarHistoricoLotacaoModal({ servidor, escolas = [],
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-4">
           <div className="p-3 bg-violet-50 border border-violet-100 rounded-2xl">
             <p className="text-xs leading-relaxed text-violet-800">
               Use esta opção para registrar uma passagem anterior que não foi cadastrada. O vínculo será salvo como histórico encerrado e não alterará a escola atual.
@@ -127,8 +127,8 @@ export default function AdicionarHistoricoLotacaoModal({ servidor, escolas = [],
           {saved && <p className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5"><CheckCircle2 size={14} /> Histórico registrado com sucesso.</p>}
         </div>
 
-        <div className="px-5 py-4 border-t border-slate-100 flex gap-3">
-          <button onClick={onClose} disabled={saving} className="px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
+        <div className="modal-footer-safe px-5 py-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 shrink-0">
+          <button onClick={onClose} disabled={saving} className="w-full sm:w-auto px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
           <button onClick={handleSalvar} disabled={saving || saved || escolasDisponiveis.length === 0} className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 active:scale-[0.98] transition-all">
             {saving ? <><Loader2 size={14} className="animate-spin" /> Salvando…</> : <><History size={14} /> Adicionar ao histórico</>}
           </button>

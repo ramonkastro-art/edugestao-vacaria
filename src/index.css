@@ -17,3 +17,25 @@ button, a, select, input, textarea { -webkit-tap-highlight-color: transparent; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+
+/* Ajustes de ergonomia para celulares e modo instalado */
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+button, a, select { touch-action: manipulation; }
+
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px; }
+  .mobile-scroll-x {
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .mobile-scroll-x::-webkit-scrollbar { display: none; }
+}
+
+@media (display-mode: standalone) {
+  body { padding-top: env(safe-area-inset-top, 0px); }
+}
+
+.modal-footer-safe { padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }

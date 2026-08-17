@@ -195,7 +195,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/25 backdrop-blur-sm"
       onClick={onClose}>
-      <div className="bg-white w-full md:max-w-lg md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col"
+      <div className="bg-white w-full md:max-w-lg md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[calc(100dvh-0.5rem)] md:max-h-[94vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
 
         {/* Drag handle mobile */}
@@ -219,7 +219,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
         </div>
 
         {/* Corpo scrollável */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4 space-y-5">
 
           {/* Dados pessoais */}
           <div className="space-y-3">
@@ -380,15 +380,15 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
         </div>
 
         {/* Rodapé */}
-        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+        <div className="modal-footer-safe px-4 sm:px-5 py-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 shrink-0">
           {!isNovo && (
             <button onClick={() => setConfirmDel(true)}
-              className="flex items-center gap-1.5 px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
               <Trash2 size={14} />
             </button>
           )}
           <button onClick={onClose}
-            className="px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            className="w-full sm:w-auto px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             Cancelar
           </button>
           <button onClick={handleSave} disabled={saving}

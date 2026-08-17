@@ -231,7 +231,7 @@ function Dashboard({ onSelectSchool }) {
       </div>
       <div>
         <h2 className="text-sm font-semibold text-slate-700 mb-3">Por modalidade</h2>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {['EMEF','EMEI','EMEF Campo','SMED'].map(tipo=>{
             const count=escolas.filter(e=>e.tipo===tipo).length
             return (
@@ -280,10 +280,10 @@ function SchoolsGrid({ onSelectSchool }) {
           <Search size={15} className="text-slate-400"/>
           <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Filtrar..." value={search} onChange={e=>setSearch(e.target.value)}/>
         </div>
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="mobile-scroll-x flex gap-1.5 flex-nowrap pb-1 -mx-1 px-1">
           {['Todos','EMEF','EMEI','EMEF Campo','SMED'].map(t=>(
             <button key={t} onClick={()=>setTipoFiltro(t)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${tipoFiltro===t?'bg-slate-900 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{t}</button>
+              className={`shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all ${tipoFiltro===t?'bg-slate-900 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{t}</button>
           ))}
         </div>
       </div>
@@ -319,7 +319,7 @@ function SchoolQuadro({ escola, onBack, onOpenServidor }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <button onClick={onBack} className="p-2 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors shrink-0">
           <ChevronRight size={18} className="text-slate-400 rotate-180"/>
         </button>
@@ -348,14 +348,14 @@ function SchoolQuadro({ escola, onBack, onOpenServidor }) {
             const outrasEscolas=(srv.lotacoes??[]).filter(l=>l.escola_id!==escola.id).map(l=>l.escola?.name).filter(Boolean)
             const efeS=efe[srv.id]
             return (
-              <div key={srv.id} className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
+              <div key={srv.id} className="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
                 <div className="cursor-pointer shrink-0" onClick={()=>onOpenServidor(srv)}><AvatarCircle name={srv.nome}/></div>
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>onOpenServidor(srv)}>
                   <p className="text-sm font-semibold text-slate-800 leading-snug">{srv.nome}</p>
                   {srv.funcao&&<p className="text-xs text-slate-400 truncate">{srv.funcao}</p>}
                   {outrasEscolas.length>0&&<p className="text-xs text-blue-500 truncate">+ {outrasEscolas.join(', ')}</p>}
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="w-full sm:w-auto flex items-center justify-end gap-1 shrink-0">
                   <button onClick={()=>salvarEfe(srv.id,'ok',null)}
                     className={`p-2 rounded-xl transition-all ${efeS?.status==='ok'?'bg-emerald-500 text-white':'bg-slate-100 text-slate-500'}`}>
                     <CheckCircle2 size={15}/>
@@ -401,9 +401,9 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
   if(loading)return<Spinner/>
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div><h1 className="text-xl font-semibold text-slate-900">Servidores</h1><p className="text-sm text-slate-500 mt-0.5">{servidores.length} cadastrados · rede municipal</p></div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 ml-auto">
           <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><RefreshCw size={16} className="text-slate-500"/></button>
           <button onClick={onNovoServidor} className="flex items-center gap-1.5 px-3 py-2 bg-slate-950 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
             <UserPlus size={15}/> Novo
@@ -419,14 +419,14 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
             placeholder="Buscar por nome..." value={search} onChange={e=>setSearch(e.target.value)}/>
           {search&&<button onClick={()=>setSearch('')}><X size={14} className="text-slate-400"/></button>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)}
-            className="flex-1 px-3 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+            className="w-full sm:flex-1 px-3 py-3 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
             <option value="">Todas as escolas</option>
             {escolas.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
           <select value={statusFiltro} onChange={e=>setStatusFiltro(e.target.value)}
-            className="px-3 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
+            className="w-full sm:w-auto px-3 py-3 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
             <option value="">Todos</option>
             <option>Ativo</option><option>Afastado</option><option>Inativo</option>
           </select>
@@ -439,7 +439,7 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
           const escNomes=[...new Set((s.lotacoes??[]).map(l=>l.escola?.name).filter(Boolean))]
           return (
             <div key={s.id} onClick={()=>onOpenServidor(s)}
-              className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 active:bg-slate-50 cursor-pointer transition-all">
+              className="flex items-center gap-2.5 sm:gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 active:bg-slate-50 cursor-pointer transition-all">
               <AvatarCircle name={s.nome}/>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -452,7 +452,7 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
               {canEdit && (
                 <button
                   onClick={event => { event.stopPropagation(); onEdit(s) }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors shrink-0"
+                  className="inline-flex items-center gap-1.5 p-2.5 sm:px-2.5 sm:py-2 rounded-xl text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors shrink-0"
                   title="Editar dados do servidor"
                   aria-label={`Editar dados de ${s.nome}`}
                 >
@@ -507,13 +507,13 @@ function EfeModule({ onOpenServidor }) {
         {filtered.map(s=>{
           const efeS=efe[s.id]
           return (
-            <div key={s.id} className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
+              <div key={s.id} className="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
               <AvatarCircle name={s.nome}/>
               <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>onOpenServidor(s)}>
                 <p className="text-sm font-semibold text-slate-800 truncate">{s.nome}</p>
                 {s.funcao&&<p className="text-xs text-slate-400">{s.funcao}</p>}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="w-full sm:w-auto flex items-center justify-end gap-1.5 shrink-0">
                 <button onClick={()=>escolaSel&&salvarEfe(s.id,'ok',null)} disabled={!escolaSel}
                   className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-40 ${efeS?.status==='ok'?'bg-emerald-500 text-white':'bg-slate-100 text-slate-500'}`}>
                   <CheckCircle2 size={13}/><span className="hidden sm:inline ml-1">OK</span>
