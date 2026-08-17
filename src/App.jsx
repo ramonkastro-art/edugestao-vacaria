@@ -583,7 +583,7 @@ export default function App() {
   ]
   const currentNavId=view==='school-detail'?'schools':view
   const sideW=sidebarOpen?'w-56':'w-16'
-  const mainML=sidebarOpen?'ml-56':'ml-16'
+  const mainML=sidebarOpen?'md:ml-56':'md:ml-16'
 
   return (
     <div className="min-h-screen bg-slate-50" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>

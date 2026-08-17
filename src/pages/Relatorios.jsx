@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  Download, FileDown, FileSpreadsheet, Filter, Printer,
+  FileSpreadsheet, Filter, Printer,
   RefreshCw, Search, SlidersHorizontal, Users, X,
 } from 'lucide-react'
 import { useEscolas, useServidores } from '../hooks/useData'
@@ -196,16 +196,16 @@ export default function Relatorios() {
   const totalFiltros = [busca, grupo, funcao, formacao, escolaId, status, vinculo].filter(Boolean).length
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+    <div className="w-full min-w-0 max-w-full overflow-x-hidden space-y-5">
+      <div className="flex min-w-0 flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Relatórios</h1>
           <p className="text-sm text-slate-500 mt-0.5">Filtre servidores e gere documentos para impressão ou análise.</p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <button onClick={reload} className="p-2.5 rounded-xl hover:bg-slate-100 transition-colors" title="Atualizar dados" aria-label="Atualizar dados"><RefreshCw size={16} className="text-slate-500" /></button>
-          <button onClick={baixarCsv} disabled={!filtered.length} className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 disabled:opacity-40"><FileSpreadsheet size={15} /> CSV</button>
-          <button onClick={imprimirPdf} disabled={!filtered.length} className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-950 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-40"><Printer size={15} /> PDF</button>
+        <div className="flex w-full sm:w-auto flex-wrap gap-2 shrink-0">
+          <button onClick={reload} className="p-2.5 rounded-xl hover:bg-slate-100 transition-colors shrink-0" title="Atualizar dados" aria-label="Atualizar dados"><RefreshCw size={16} className="text-slate-500" /></button>
+          <button onClick={baixarCsv} disabled={!filtered.length} className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 disabled:opacity-40 shrink-0"><FileSpreadsheet size={15} /> CSV</button>
+          <button onClick={imprimirPdf} disabled={!filtered.length} className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-950 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-40 shrink-0"><Printer size={15} /> PDF</button>
         </div>
       </div>
 
@@ -219,7 +219,7 @@ export default function Relatorios() {
         ))}
       </div>
 
-      <section className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+      <section className="w-full min-w-0 bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
         <button onClick={() => setMostrarFiltros(valor => !valor)} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-slate-50 transition-colors">
           <span className="flex items-center gap-2 text-sm font-semibold text-slate-700"><SlidersHorizontal size={16} /> Filtros avançados {totalFiltros > 0 && <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px]">{totalFiltros}</span>}</span>
           <span className="text-xs text-slate-400">{mostrarFiltros ? 'Ocultar' : 'Mostrar'}</span>
@@ -248,7 +248,7 @@ export default function Relatorios() {
         <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-2xl text-slate-400"><Users size={32} className="mx-auto mb-2 opacity-30" /><p className="text-sm">Nenhum servidor corresponde aos filtros.</p><p className="text-xs mt-1">Tente limpar um filtro ou usar outra formação.</p></div>
       ) : <>
         <div className="hidden md:block overflow-x-auto bg-white border border-slate-100 rounded-2xl shadow-sm"><table className="w-full text-left"><thead><tr className="bg-slate-50 border-b border-slate-100">{['Nome', 'Função', 'Formação', 'Escola(s)', 'Status', 'Vínculo'].map(coluna => <th key={coluna} className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{coluna}</th>)}</tr></thead><tbody>{filtered.map(servidor => <tr key={servidor.id} className="border-b last:border-0 border-slate-100 hover:bg-slate-50"><td className="px-4 py-3 text-sm font-semibold text-slate-800">{servidor.nome}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.funcao || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.formacao || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{nomeEscolas(servidor).join(' · ') || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.status || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.tipo_vinculo || '—'}</td></tr>)}</tbody></table></div>
-        <div className="md:hidden space-y-2">{filtered.map(servidor => <div key={servidor.id} className="bg-white border border-slate-100 rounded-2xl p-3.5 shadow-sm"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold text-slate-800 leading-snug">{servidor.nome}</p><p className="text-xs text-slate-500 mt-1">{servidor.funcao || 'Função não informada'}</p></div><span className="shrink-0 px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium">{servidor.status || '—'}</span></div><div className="grid grid-cols-1 gap-1 mt-3 text-xs text-slate-500"><p><strong className="text-slate-400 font-medium">Formação:</strong> {servidor.formacao || 'Não informada'}</p><p><strong className="text-slate-400 font-medium">Escola(s):</strong> {nomeEscolas(servidor).join(' · ') || 'Sem escola'}</p><p><strong className="text-slate-400 font-medium">Vínculo:</strong> {servidor.tipo_vinculo || 'Não informado'}</p></div></div>)}</div>
+        <div className="md:hidden min-w-0 space-y-2">{filtered.map(servidor => <div key={servidor.id} className="min-w-0 bg-white border border-slate-100 rounded-2xl p-3.5 shadow-sm break-words"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold text-slate-800 leading-snug">{servidor.nome}</p><p className="text-xs text-slate-500 mt-1">{servidor.funcao || 'Função não informada'}</p></div><span className="shrink-0 px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium">{servidor.status || '—'}</span></div><div className="grid grid-cols-1 gap-1 mt-3 text-xs text-slate-500"><p><strong className="text-slate-400 font-medium">Formação:</strong> {servidor.formacao || 'Não informada'}</p><p><strong className="text-slate-400 font-medium">Escola(s):</strong> {nomeEscolas(servidor).join(' · ') || 'Sem escola'}</p><p><strong className="text-slate-400 font-medium">Vínculo:</strong> {servidor.tipo_vinculo || 'Não informado'}</p></div></div>)}</div>
       </>}
     </div>
   )
