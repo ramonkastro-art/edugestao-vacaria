@@ -17,7 +17,7 @@ export function AuthProvider({ children }) {
       .from('user_profiles')
       .select('*')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
     setProfile(data)
     setProfileError(error?.message || (!data ? 'Perfil de acesso não encontrado.' : ''))
     setProfileLoading(false)

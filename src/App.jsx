@@ -9,6 +9,7 @@ import { supabase } from './lib/supabase'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import EditarServidor from './pages/EditarServidor'
+import Relatorios from './pages/Relatorios'
 import ServidorModal from './components/ServidorModal'
 import TransferirLotacaoModal from './components/TransferirLotacaoModal'
 import AdicionarHistoricoLotacaoModal from './components/AdicionarHistoricoLotacaoModal'
@@ -650,7 +651,7 @@ export default function App() {
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
           {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={admin} refreshToken={dataVersion}/>}
           {view==='efe'&&<EfeModule onOpenServidor={setSelectedServidor}/>}
-          {view==='relatorios'&&<div className="flex items-center justify-center h-64 text-slate-400"><div className="text-center"><FileText size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Relatórios · em breve</p></div></div>}
+          {view==='relatorios'&&<Relatorios/>}
         </main>
       </div>
 
