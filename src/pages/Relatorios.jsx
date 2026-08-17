@@ -6,7 +6,7 @@ import {
 import { useEscolas, useServidores } from '../hooks/useData'
 
 function normalizar(valor = '') {
-  return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  return String(valor ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 }
 
 function categoriaFuncao(funcao = '') {
@@ -19,7 +19,8 @@ function categoriaFuncao(funcao = '') {
 }
 
 function nomeEscolas(servidor) {
-  return [...new Set((servidor.lotacoes ?? []).map(lotacao => lotacao.escola?.name).filter(Boolean))]
+  const lotacoes = Array.isArray(servidor?.lotacoes) ? servidor.lotacoes : []
+  return [...new Set(lotacoes.map(lotacao => String(lotacao?.escola?.name ?? '').trim()).filter(Boolean))]
 }
 
 function csvCell(valor = '') {
@@ -59,16 +60,16 @@ export default function Relatorios() {
   const [vinculo, setVinculo] = useState('')
   const [mostrarFiltros, setMostrarFiltros] = useState(true)
 
-  const funcoes = useMemo(() => [...new Set(servidores.map(servidor => servidor.funcao).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [servidores])
-  const formacoes = useMemo(() => [...new Set(servidores.map(servidor => servidor.formacao).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [servidores])
+  const funcoes = useMemo(() => [...new Set((servidores ?? []).filter(Boolean).map(servidor => String(servidor.funcao ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [servidores])
+  const formacoes = useMemo(() => [...new Set((servidores ?? []).filter(Boolean).map(servidor => String(servidor.formacao ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [servidores])
 
   const filtered = useMemo(() => {
     const termo = normalizar(busca)
-    return servidores.filter(servidor => {
+    return (servidores ?? []).filter(Boolean).filter(servidor => {
       const nome = normalizar(servidor.nome)
       const funcaoNormalizada = normalizar(servidor.funcao)
       const formacaoNormalizada = normalizar(servidor.formacao)
-      const escolasServidor = servidor.lotacoes ?? []
+      const escolasServidor = Array.isArray(servidor.lotacoes) ? servidor.lotacoes : []
       const nomeEscolaServidor = nomeEscolas(servidor).map(normalizar).join(' ')
       const buscaOk = !termo || nome.includes(termo) || funcaoNormalizada.includes(termo) || formacaoNormalizada.includes(termo) || nomeEscolaServidor.includes(termo)
       const grupoOk = !grupo || categoriaFuncao(servidor.funcao) === grupo
@@ -234,7 +235,7 @@ export default function Relatorios() {
             <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Grupo de função</span><select value={grupo} onChange={event => alterarFiltro(setGrupo, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todos os grupos</option><option>Professores</option><option>Merendeiras</option><option>Gestão</option><option>Administrativo</option><option>Apoio</option></select></label>
             <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Função específica</span><select value={funcao} onChange={event => alterarFiltro(setFuncao, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todas as funções</option>{funcoes.map(item => <option key={item}>{item}</option>)}</select></label>
             <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Formação contém</span><input list="formacoes-disponiveis" value={formacao} onChange={event => alterarFiltro(setFormacao, event.target.value)} placeholder="Ex.: Português ou Matemática" className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none placeholder:text-slate-300" /><datalist id="formacoes-disponiveis">{formacoes.map(item => <option key={item} value={item} />)}</datalist></label>
-            <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Escola</span><select value={escolaId} onChange={event => alterarFiltro(setEscolaId, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todas as escolas</option>{escolas.map(escola => <option key={escola.id} value={escola.id}>{escola.name}</option>)}</select></label>
+            <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Escola</span><select value={escolaId} onChange={event => alterarFiltro(setEscolaId, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todas as escolas</option>{(escolas ?? []).filter(Boolean).map(escola => <option key={escola.id} value={escola.id}>{escola.name || 'Escola sem nome'}</option>)}</select></label>
             <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Status</span><select value={status} onChange={event => alterarFiltro(setStatus, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todos os status</option><option>Ativo</option><option>Afastado</option><option>Inativo</option></select></label>
             <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Tipo de vínculo</span><select value={vinculo} onChange={event => alterarFiltro(setVinculo, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todos os vínculos</option><option>Efetivo</option><option>Designação</option><option>Contratado</option><option>Temporário</option><option>Estágio</option></select></label>
           </div>
@@ -247,8 +248,8 @@ export default function Relatorios() {
       {loading ? <div className="flex items-center justify-center py-20"><RefreshCw size={22} className="animate-spin text-slate-400" /></div> : filtered.length === 0 ? (
         <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-2xl text-slate-400"><Users size={32} className="mx-auto mb-2 opacity-30" /><p className="text-sm">Nenhum servidor corresponde aos filtros.</p><p className="text-xs mt-1">Tente limpar um filtro ou usar outra formação.</p></div>
       ) : <>
-        <div className="hidden md:block overflow-x-auto bg-white border border-slate-100 rounded-2xl shadow-sm"><table className="w-full text-left"><thead><tr className="bg-slate-50 border-b border-slate-100">{['Nome', 'Função', 'Formação', 'Escola(s)', 'Status', 'Vínculo'].map(coluna => <th key={coluna} className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{coluna}</th>)}</tr></thead><tbody>{filtered.map(servidor => <tr key={servidor.id} className="border-b last:border-0 border-slate-100 hover:bg-slate-50"><td className="px-4 py-3 text-sm font-semibold text-slate-800">{servidor.nome}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.funcao || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.formacao || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{nomeEscolas(servidor).join(' · ') || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.status || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.tipo_vinculo || '—'}</td></tr>)}</tbody></table></div>
-        <div className="md:hidden min-w-0 space-y-2">{filtered.map(servidor => <div key={servidor.id} className="min-w-0 bg-white border border-slate-100 rounded-2xl p-3.5 shadow-sm break-words"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold text-slate-800 leading-snug">{servidor.nome}</p><p className="text-xs text-slate-500 mt-1">{servidor.funcao || 'Função não informada'}</p></div><span className="shrink-0 px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium">{servidor.status || '—'}</span></div><div className="grid grid-cols-1 gap-1 mt-3 text-xs text-slate-500"><p><strong className="text-slate-400 font-medium">Formação:</strong> {servidor.formacao || 'Não informada'}</p><p><strong className="text-slate-400 font-medium">Escola(s):</strong> {nomeEscolas(servidor).join(' · ') || 'Sem escola'}</p><p><strong className="text-slate-400 font-medium">Vínculo:</strong> {servidor.tipo_vinculo || 'Não informado'}</p></div></div>)}</div>
+        <div className="hidden md:block overflow-x-auto bg-white border border-slate-100 rounded-2xl shadow-sm"><table className="w-full text-left"><thead><tr className="bg-slate-50 border-b border-slate-100">{['Nome', 'Função', 'Formação', 'Escola(s)', 'Status', 'Vínculo'].map(coluna => <th key={coluna} className="px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{coluna}</th>)}</tr></thead><tbody>{filtered.map(servidor => <tr key={servidor.id} className="border-b last:border-0 border-slate-100 hover:bg-slate-50"><td className="px-4 py-3 text-sm font-semibold text-slate-800">{servidor.nome || 'Nome não informado'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.funcao || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.formacao || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{nomeEscolas(servidor).join(' · ') || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.status || '—'}</td><td className="px-4 py-3 text-sm text-slate-600">{servidor.tipo_vinculo || '—'}</td></tr>)}</tbody></table></div>
+        <div className="md:hidden min-w-0 space-y-2">{filtered.map(servidor => <div key={servidor.id} className="min-w-0 bg-white border border-slate-100 rounded-2xl p-3.5 shadow-sm break-words"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-sm font-semibold text-slate-800 leading-snug">{servidor.nome || 'Nome não informado'}</p><p className="text-xs text-slate-500 mt-1">{servidor.funcao || 'Função não informada'}</p></div><span className="shrink-0 px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium">{servidor.status || '—'}</span></div><div className="grid grid-cols-1 gap-1 mt-3 text-xs text-slate-500"><p><strong className="text-slate-400 font-medium">Formação:</strong> {servidor.formacao || 'Não informada'}</p><p><strong className="text-slate-400 font-medium">Escola(s):</strong> {nomeEscolas(servidor).join(' · ') || 'Sem escola'}</p><p><strong className="text-slate-400 font-medium">Vínculo:</strong> {servidor.tipo_vinculo || 'Não informado'}</p></div></div>)}</div>
       </>}
     </div>
   )
