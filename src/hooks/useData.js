@@ -57,6 +57,65 @@ export function useEscolas() {
   return { escolas, loading, error, reload: load }
 }
 
+// ─── SOLICITAÇÕES DE TRANSFERÊNCIA ────────────────────────────────────────────
+
+export function useSolicitacoesTransferencia(servidorId = null) {
+  const [solicitacoes, setSolicitacoes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    let query = supabase
+      .from('solicitacoes_transferencia')
+      .select(`
+        id, servidor_id, escola_origem_id, escola_destino_id,
+        data_pedido, status, data_atendimento, observacoes,
+        created_at, updated_at,
+        servidor:servidores(id, nome),
+        escola_origem:escolas!solicitacoes_transferencia_escola_origem_id_fkey(id, name, tipo),
+        escola_destino:escolas!solicitacoes_transferencia_escola_destino_id_fkey(id, name, tipo)
+      `)
+      .order('data_pedido', { ascending: false })
+
+    if (servidorId) query = query.eq('servidor_id', servidorId)
+    const { data, error: requestError } = await query
+    setSolicitacoes(data ?? [])
+    setError(requestError ? erroMensagem(requestError) : null)
+    setLoading(false)
+  }, [servidorId])
+
+  useEffect(() => { load() }, [load])
+  return { solicitacoes, loading, error, reload: load }
+}
+
+export async function salvarSolicitacaoTransferencia({
+  id = null,
+  servidorId,
+  escolaOrigemId = null,
+  escolaDestinoId,
+  dataPedido,
+  status = 'Pendente',
+  dataAtendimento = null,
+  observacoes = null,
+}) {
+  const payload = {
+    servidor_id: servidorId,
+    escola_origem_id: escolaOrigemId ? Number(escolaOrigemId) : null,
+    escola_destino_id: Number(escolaDestinoId),
+    data_pedido: dataPedido || hojeISO(),
+    status,
+    data_atendimento: dataAtendimento || null,
+    observacoes: observacoes?.trim() || null,
+  }
+
+  const request = id
+    ? supabase.from('solicitacoes_transferencia').update(payload).eq('id', id).select('id').single()
+    : supabase.from('solicitacoes_transferencia').insert(payload).select('id').single()
+  const { data, error: requestError } = await request
+  return { data, error: requestError }
+}
+
 // ─── SERVIDORES (lista completa com lotações) ─────────────────────────────────
 
 export function useServidores() {
@@ -404,6 +463,21 @@ export async function adicionarHistoricoLotacao({
   const { data, error } = await supabase.rpc('adicionar_historico_lotacao', {
     p_servidor_id: servidorId,
     p_escola_id: Number(escolaId),
+    p_data_inicio: dataInicio,
+    p_data_fim: dataFim,
+    p_motivo: motivo?.trim() || null,
+  })
+  return { data, error }
+}
+
+export async function editarHistoricoLotacao({
+  lotacaoId,
+  dataInicio,
+  dataFim,
+  motivo = null,
+}) {
+  const { data, error } = await supabase.rpc('editar_historico_lotacao', {
+    p_lotacao_id: Number(lotacaoId),
     p_data_inicio: dataInicio,
     p_data_fim: dataFim,
     p_motivo: motivo?.trim() || null,

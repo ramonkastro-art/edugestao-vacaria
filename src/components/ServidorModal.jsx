@@ -20,7 +20,7 @@ function Badge({ children, className = '' }) {
   return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${className}`}>{children}</span>
 }
 
-export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, onAddHistorico, canEdit }) {
+export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, onAddHistorico, onEditHistorico, onAddSolicitacao, canEdit }) {
   const [tab, setTab] = useState('escola') // 'escola' | 'dados' | 'historico'
   const [cadastro, setCadastro] = useState(null)
   const [loadingCadastro, setLoadingCadastro] = useState(false)
@@ -251,7 +251,16 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
                     </div>
                   </div>
                 )}
-                {!dadosBase.data_nascimento && !dadosBase.telefone && !dadosBase.email && !dadosBase.endereco && (
+                {dadosBase.observacoes && (
+                  <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-2xl">
+                    <FileText size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-xs text-amber-600">Anotações / observações</p>
+                      <p className="text-sm text-slate-700 mt-0.5 whitespace-pre-wrap break-words">{dadosBase.observacoes}</p>
+                    </div>
+                  </div>
+                )}
+                {!dadosBase.data_nascimento && !dadosBase.telefone && !dadosBase.email && !dadosBase.endereco && !dadosBase.formacao && !dadosBase.observacoes && (
                   <div className="text-center py-8 text-slate-400">
                     <Info size={28} className="mx-auto mb-2 opacity-30" />
                     <p className="text-sm">Sem dados cadastrais registrados</p>
@@ -270,16 +279,26 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
           {/* ABA: Histórico */}
           {tab === 'historico' && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Histórico de lotações</p>
-                {canEdit && onAddHistorico && (
-                  <button
-                    onClick={() => { onClose(); onAddHistorico(servidor) }}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-violet-50 border border-violet-100 text-violet-700 text-xs font-medium hover:bg-violet-100 transition-colors"
-                  >
-                    <History size={13} /> Adicionar escola
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {canEdit && onAddSolicitacao && (
+                    <button
+                      onClick={() => { onClose(); onAddSolicitacao(servidor) }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                    >
+                      <ArrowRightLeft size={13} /> Pedido de transferência
+                    </button>
+                  )}
+                  {canEdit && onAddHistorico && (
+                    <button
+                      onClick={() => { onClose(); onAddHistorico(servidor) }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-violet-50 border border-violet-100 text-violet-700 text-xs font-medium hover:bg-violet-100 transition-colors"
+                    >
+                      <History size={13} /> Adicionar escola
+                    </button>
+                  )}
+                </div>
               </div>
               {loadingHistorico ? (
                 <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
@@ -308,8 +327,20 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
                             <School size={15} className={`mt-0.5 shrink-0 ${atual ? 'text-emerald-600' : 'text-slate-400'}`} />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
-                                <p className="text-sm font-medium text-slate-800 leading-snug">{lotacao.escola?.name ?? 'Escola não encontrada'}</p>
-                                <Badge className={atual ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}>{atual ? 'Atual' : 'Encerrada'}</Badge>
+                                <p className="text-sm font-medium text-slate-800 leading-snug min-w-0">{lotacao.escola?.name ?? 'Escola não encontrada'}</p>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <Badge className={atual ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}>{atual ? 'Atual' : 'Encerrada'}</Badge>
+                                  {canEdit && onEditHistorico && (
+                                    <button
+                                      onClick={() => { onClose(); onEditHistorico(lotacao) }}
+                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 text-[10px] font-medium hover:text-slate-800 hover:border-slate-300 transition-colors"
+                                      title={atual ? 'Encerrar vínculo e manter no histórico' : 'Editar vínculo histórico'}
+                                      aria-label={atual ? 'Encerrar vínculo e manter no histórico' : 'Editar vínculo histórico'}
+                                    >
+                                      <Edit2 size={11} /> Editar
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <p className="text-xs text-slate-400 mt-1">Desde {inicio}{fim ? ` até ${fim}` : ''}</p>
                               {!atual && lotacao.motivo_saida && <p className="text-xs text-slate-500 mt-1">Motivo: {lotacao.motivo_saida}</p>}

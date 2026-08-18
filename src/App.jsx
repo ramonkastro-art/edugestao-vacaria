@@ -13,6 +13,8 @@ import Relatorios from './pages/Relatorios'
 import ServidorModal from './components/ServidorModal'
 import TransferirLotacaoModal from './components/TransferirLotacaoModal'
 import AdicionarHistoricoLotacaoModal from './components/AdicionarHistoricoLotacaoModal'
+import EditarHistoricoLotacaoModal from './components/EditarHistoricoLotacaoModal'
+import SolicitacaoTransferenciaModal from './components/SolicitacaoTransferenciaModal'
 import {
   useEscolas, useServidores, useServidoresByEscola,
   useEfetividade, useDashboardStats, buscarGlobal,
@@ -546,6 +548,8 @@ export default function App() {
   const [selectedServidor,setSelectedServidor]=useState(null)
   const [transferServidor,setTransferServidor]=useState(null)
   const [historicoServidor,setHistoricoServidor]=useState(null)
+  const [historicoLotacaoEdit,setHistoricoLotacaoEdit]=useState(null)
+  const [solicitacaoTransferenciaEdit,setSolicitacaoTransferenciaEdit]=useState(null)
   const [editServidor,setEditServidor]=useState(null)
   const [isNovo,setIsNovo]=useState(false)
   const [searchOpen,setSearchOpen]=useState(false)
@@ -651,7 +655,7 @@ export default function App() {
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
           {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={admin} refreshToken={dataVersion}/>}
           {view==='efe'&&<EfeModule onOpenServidor={setSelectedServidor}/>}
-          {view==='relatorios'&&<Relatorios/>}
+          {view==='relatorios'&&<Relatorios onEditSolicitacao={admin ? (item => { const servidor = allServidores.find(s => s.id === item.servidor_id) ?? item.servidor; setSolicitacaoTransferenciaEdit({ servidor, solicitacao: item }) }) : null}/>}
         </main>
       </div>
 
@@ -666,6 +670,8 @@ export default function App() {
           onEdit={admin?openEditServidor:null}
           onTransfer={admin ? (srv => { setSelectedServidor(null); setTransferServidor(srv) }) : null}
           onAddHistorico={admin ? (srv => { setSelectedServidor(null); setHistoricoServidor(srv) }) : null}
+          onEditHistorico={admin ? (lotacao => { setHistoricoLotacaoEdit({ servidor: selectedServidor, lotacao }); setSelectedServidor(null) }) : null}
+          onAddSolicitacao={admin ? (srv => { setSolicitacaoTransferenciaEdit({ servidor: srv, solicitacao: null }); setSelectedServidor(null) }) : null}
           canEdit={admin}
         />
       )}
@@ -685,6 +691,25 @@ export default function App() {
           escolas={escolas}
           onClose={()=>setHistoricoServidor(null)}
           onSuccess={handleDataChanged}
+        />
+      )}
+
+      {historicoLotacaoEdit&&(
+        <EditarHistoricoLotacaoModal
+          servidor={historicoLotacaoEdit.servidor}
+          lotacao={historicoLotacaoEdit.lotacao}
+          onClose={()=>setHistoricoLotacaoEdit(null)}
+          onSuccess={()=>{ handleDataChanged(); setHistoricoLotacaoEdit(null) }}
+        />
+      )}
+
+      {solicitacaoTransferenciaEdit&&(
+        <SolicitacaoTransferenciaModal
+          servidor={solicitacaoTransferenciaEdit.servidor}
+          solicitacao={solicitacaoTransferenciaEdit.solicitacao}
+          escolas={escolas}
+          onClose={()=>setSolicitacaoTransferenciaEdit(null)}
+          onSuccess={()=>{ handleDataChanged(); setSolicitacaoTransferenciaEdit(null) }}
         />
       )}
 
