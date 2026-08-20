@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   X, School, AlertCircle, GraduationCap, Briefcase,
   Phone, Mail, MapPin, Calendar, Hash, ArrowRightLeft,
-  FileText, Clock, History, Info, Edit2, ChevronRight, Loader2,
+  FileText, Clock, Info, Edit2, ChevronRight, Loader2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -20,13 +20,10 @@ function Badge({ children, className = '' }) {
   return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${className}`}>{children}</span>
 }
 
-export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, onAddHistorico, onEditHistorico, onAddSolicitacao, canEdit }) {
+export default function ServidorModal({ servidor, onClose, onEdit, canEdit }) {
   const [tab, setTab] = useState('escola') // 'escola' | 'dados' | 'historico'
   const [cadastro, setCadastro] = useState(null)
   const [loadingCadastro, setLoadingCadastro] = useState(false)
-  const [historico, setHistorico] = useState([])
-  const [loadingHistorico, setLoadingHistorico] = useState(false)
-  const [historicoError, setHistoricoError] = useState('')
 
   if (!servidor) return null
 
@@ -45,22 +42,6 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
       .then(({ data }) => { setCadastro(data); setLoadingCadastro(false) })
   }, [tab, servidor.id, cadastro])
 
-  useEffect(() => {
-    if (tab !== 'historico') return
-    setLoadingHistorico(true)
-    setHistoricoError('')
-    supabase
-      .from('lotacoes')
-      .select('id, escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo)')
-      .eq('servidor_id', servidor.id)
-      .order('data_inicio', { ascending: false })
-      .then(({ data, error }) => {
-        setHistorico(data ?? [])
-        setHistoricoError(error?.message || '')
-        setLoadingHistorico(false)
-      })
-  }, [tab, servidor.id])
-
   const dadosBase = cadastro ?? servidor
 
   return (
@@ -69,7 +50,7 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
       onClick={onClose}
     >
       <div
-        className="bg-white w-full md:max-w-md md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] flex flex-col"
+        className="bg-white w-full md:max-w-md md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Drag handle mobile */}
@@ -100,22 +81,11 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {canEdit && onTransfer && (
-                <button
-                  onClick={() => { onClose(); onTransfer(servidor) }}
-                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
-                  title="Transferir de escola"
-                  aria-label="Transferir de escola"
-                >
-                  <ArrowRightLeft size={15} className="text-white" />
-                </button>
-              )}
               {canEdit && (
                 <button
                   onClick={() => { onClose(); onEdit(servidor) }}
                   className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
                   title="Editar"
-                  aria-label="Editar cadastro"
                 >
                   <Edit2 size={15} className="text-white" />
                 </button>
@@ -146,7 +116,7 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
         </div>
 
         {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
 
           {/* ABA: Escola */}
           {tab === 'escola' && (
@@ -189,17 +159,16 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Dados Pessoais</p>
-                  {canEdit && (
-                    <button
-                      onClick={() => { onClose(); onEdit(servidor) }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-medium hover:bg-slate-200 transition-colors"
-                    >
-                      <Edit2 size={13} /> Editar dados
-                    </button>
-                  )}
-                </div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Dados Pessoais</p>
+                {dadosBase.cpf && (
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
+                    <Hash size={15} className="text-slate-400 shrink-0" />
+                    <div>
+                      <p className="text-xs text-slate-400">CPF</p>
+                      <p className="text-sm font-medium text-slate-700 font-mono">{dadosBase.cpf}</p>
+                    </div>
+                  </div>
+                )}
                 {dadosBase.data_nascimento && (
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">
                     <Calendar size={15} className="text-slate-400 shrink-0" />
@@ -251,16 +220,7 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
                     </div>
                   </div>
                 )}
-                {dadosBase.observacoes && (
-                  <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-2xl">
-                    <FileText size={15} className="text-amber-600 shrink-0 mt-0.5" />
-                    <div className="min-w-0">
-                      <p className="text-xs text-amber-600">Anotações / observações</p>
-                      <p className="text-sm text-slate-700 mt-0.5 whitespace-pre-wrap break-words">{dadosBase.observacoes}</p>
-                    </div>
-                  </div>
-                )}
-                {!dadosBase.data_nascimento && !dadosBase.telefone && !dadosBase.email && !dadosBase.endereco && !dadosBase.formacao && !dadosBase.observacoes && (
+                {!dadosBase.data_nascimento && !dadosBase.telefone && !dadosBase.email && !dadosBase.endereco && (
                   <div className="text-center py-8 text-slate-400">
                     <Info size={28} className="mx-auto mb-2 opacity-30" />
                     <p className="text-sm">Sem dados cadastrais registrados</p>
@@ -278,98 +238,20 @@ export default function ServidorModal({ servidor, onClose, onEdit, onTransfer, o
 
           {/* ABA: Histórico */}
           {tab === 'historico' && (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Histórico de lotações</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {canEdit && onAddSolicitacao && (
-                    <button
-                      onClick={() => { onClose(); onAddSolicitacao(servidor) }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
-                    >
-                      <ArrowRightLeft size={13} /> Pedido de transferência
-                    </button>
-                  )}
-                  {canEdit && onAddHistorico && (
-                    <button
-                      onClick={() => { onClose(); onAddHistorico(servidor) }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-violet-50 border border-violet-100 text-violet-700 text-xs font-medium hover:bg-violet-100 transition-colors"
-                    >
-                      <History size={13} /> Adicionar escola
-                    </button>
-                  )}
-                </div>
-              </div>
-              {loadingHistorico ? (
-                <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-slate-400" /></div>
-              ) : historicoError ? (
-                <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-800">
-                  O histórico detalhado ainda não está disponível. Execute a migração `migration_historico_lotacoes.sql` no Supabase.
-                </div>
-              ) : historico.length === 0 ? (
-                <div className="text-center py-10 text-slate-400">
-                  <Clock size={28} className="mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Nenhuma movimentação registrada</p>
-                  <p className="text-xs text-slate-300 mt-1">Use “Adicionar escola” para registrar uma passagem anterior.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {historico.map((lotacao, index) => {
-                    const inicio = lotacao.data_inicio ? new Date(`${lotacao.data_inicio}T12:00:00`).toLocaleDateString('pt-BR') : 'Data não informada'
-                    const fim = lotacao.data_fim ? new Date(`${lotacao.data_fim}T12:00:00`).toLocaleDateString('pt-BR') : null
-                    const atual = !lotacao.data_fim
-                    return (
-                      <div key={lotacao.id ?? `${lotacao.escola_id}-${index}`} className="relative pl-5">
-                        {index < historico.length - 1 && <span className="absolute left-[5px] top-4 bottom-[-14px] w-px bg-slate-200" />}
-                        <span className={`absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full ring-4 ring-white ${atual ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                        <div className={`p-3 rounded-2xl border ${atual ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
-                          <div className="flex items-start gap-2">
-                            <School size={15} className={`mt-0.5 shrink-0 ${atual ? 'text-emerald-600' : 'text-slate-400'}`} />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-sm font-medium text-slate-800 leading-snug min-w-0">{lotacao.escola?.name ?? 'Escola não encontrada'}</p>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <Badge className={atual ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}>{atual ? 'Atual' : 'Encerrada'}</Badge>
-                                  {canEdit && onEditHistorico && (
-                                    <button
-                                      onClick={() => { onClose(); onEditHistorico(lotacao) }}
-                                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 text-[10px] font-medium hover:text-slate-800 hover:border-slate-300 transition-colors"
-                                      title={atual ? 'Encerrar vínculo e manter no histórico' : 'Editar vínculo histórico'}
-                                      aria-label={atual ? 'Encerrar vínculo e manter no histórico' : 'Editar vínculo histórico'}
-                                    >
-                                      <Edit2 size={11} /> Editar
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-xs text-slate-400 mt-1">Desde {inicio}{fim ? ` até ${fim}` : ''}</p>
-                              {!atual && lotacao.motivo_saida && <p className="text-xs text-slate-500 mt-1">Motivo: {lotacao.motivo_saida}</p>}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+            <div className="text-center py-10 text-slate-400">
+              <Clock size={28} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Histórico de movimentações</p>
+              <p className="text-xs text-slate-300 mt-1">Em desenvolvimento</p>
             </div>
           )}
         </div>
 
         {/* Footer actions */}
         {canEdit && (
-          <div className="modal-footer-safe px-4 sm:px-5 py-4 border-t border-slate-100 shrink-0 flex flex-col sm:flex-row gap-2">
-            {onTransfer && (
-              <button
-                onClick={() => { onClose(); onTransfer(servidor) }}
-                className="flex items-center justify-center gap-2 px-3 py-3 border border-blue-200 text-blue-700 bg-blue-50 rounded-2xl text-sm font-medium hover:bg-blue-100 active:scale-95 transition-all"
-              >
-                <ArrowRightLeft size={14} /> <span className="hidden sm:inline">Transferir</span>
-              </button>
-            )}
+          <div className="px-5 py-4 border-t border-slate-100 shrink-0">
             <button
               onClick={() => { onClose(); onEdit(servidor) }}
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 active:scale-95 transition-all"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 active:scale-95 transition-all"
             >
               <Edit2 size={14} /> Editar cadastro
             </button>

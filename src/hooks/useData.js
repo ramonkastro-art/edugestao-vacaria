@@ -7,154 +7,42 @@ export function normStr(s) {
   return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
 }
 
-function somenteLotacoesAtuais(servidores = []) {
-  return servidores.map(servidor => ({
-    ...servidor,
-    lotacoes: (servidor.lotacoes ?? []).filter(lotacao => !lotacao.data_fim),
-  }))
-}
-
-export function hojeISO() {
-  const agora = new Date()
-  const ano = agora.getFullYear()
-  const mes = String(agora.getMonth() + 1).padStart(2, '0')
-  const dia = String(agora.getDate()).padStart(2, '0')
-  return `${ano}-${mes}-${dia}`
-}
-
-const SERVIDOR_FIELDS = `
-  id, nome, nome_norm, status, funcao, tipo_vinculo,
-  matricula, email, telefone, data_nascimento,
-  endereco, formacao, regencia_h, htp_h, hti_h, observacoes,
-  lotacoes ( escola_id, principal, escola:escolas(id, name, tipo) )
-`
-
-const SERVIDOR_FIELDS_HISTORICO = `
-  id, nome, nome_norm, status, funcao, tipo_vinculo,
-  matricula, email, telefone, data_nascimento,
-  endereco, formacao, regencia_h, htp_h, hti_h, observacoes,
-  lotacoes ( escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo) )
-`
-
-function erroMensagem(error) {
-  return error?.message || error?.details || error?.hint || 'Não foi possível carregar os dados.'
-}
-
 // ─── ESCOLAS ─────────────────────────────────────────────────────────────────
 
 export function useEscolas() {
   const [escolas, setEscolas] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const load = useCallback(async () => {
-    setLoading(true)
-    const { data, error: requestError } = await supabase.from('escolas').select('*').order('name')
-    setEscolas(data ?? [])
-    setError(requestError ? erroMensagem(requestError) : null)
-    setLoading(false)
+  useEffect(() => {
+    supabase.from('escolas').select('*').order('name')
+      .then(({ data }) => { setEscolas(data ?? []); setLoading(false) })
   }, [])
-  useEffect(() => { load() }, [load])
-  return { escolas, loading, error, reload: load }
-}
-
-// ─── SOLICITAÇÕES DE TRANSFERÊNCIA ────────────────────────────────────────────
-
-export function useSolicitacoesTransferencia(servidorId = null) {
-  const [solicitacoes, setSolicitacoes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    let query = supabase
-      .from('solicitacoes_transferencia')
-      .select(`
-        id, servidor_id, escola_origem_id, escola_destino_id,
-        data_pedido, status, data_atendimento, observacoes,
-        created_at, updated_at,
-        servidor:servidores(id, nome),
-        escola_origem:escolas!solicitacoes_transferencia_escola_origem_id_fkey(id, name, tipo),
-        escola_destino:escolas!solicitacoes_transferencia_escola_destino_id_fkey(id, name, tipo)
-      `)
-      .order('data_pedido', { ascending: false })
-
-    if (servidorId) query = query.eq('servidor_id', servidorId)
-    const { data, error: requestError } = await query
-    setSolicitacoes(data ?? [])
-    setError(requestError ? erroMensagem(requestError) : null)
-    setLoading(false)
-  }, [servidorId])
-
-  useEffect(() => { load() }, [load])
-  return { solicitacoes, loading, error, reload: load }
-}
-
-export async function salvarSolicitacaoTransferencia({
-  id = null,
-  servidorId,
-  escolaOrigemId = null,
-  escolaDestinoId,
-  dataPedido,
-  status = 'Pendente',
-  dataAtendimento = null,
-  observacoes = null,
-}) {
-  const payload = {
-    servidor_id: servidorId,
-    escola_origem_id: escolaOrigemId ? Number(escolaOrigemId) : null,
-    escola_destino_id: Number(escolaDestinoId),
-    data_pedido: dataPedido || hojeISO(),
-    status,
-    data_atendimento: dataAtendimento || null,
-    observacoes: observacoes?.trim() || null,
-  }
-
-  const request = id
-    ? supabase.from('solicitacoes_transferencia').update(payload).eq('id', id).select('id').single()
-    : supabase.from('solicitacoes_transferencia').insert(payload).select('id').single()
-  const { data, error: requestError } = await request
-  return { data, error: requestError }
+  return { escolas, loading }
 }
 
 // ─── SERVIDORES (lista completa com lotações) ─────────────────────────────────
 
 export function useServidores() {
   const [servidores, setServidores] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [migrationWarning, setMigrationWarning] = useState(false)
+  const [loading, setLoading]       = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
-    setError(null)
-    setMigrationWarning(false)
-
-    let { data, error: requestError } = await supabase
+    const { data, error } = await supabase
       .from('servidores')
-      .select(SERVIDOR_FIELDS_HISTORICO)
+      .select(`
+        id, nome, nome_norm, status, funcao, tipo_vinculo,
+        matricula, email, telefone, data_nascimento,
+        endereco, formacao, regencia_h, htp_h, hti_h, observacoes,
+        lotacoes ( escola_id, principal, escola:escolas(id, name, tipo) )
+      `)
       .order('nome')
-
-    if (requestError) {
-      console.warn('useServidores: consulta com histórico falhou; usando compatibilidade:', requestError)
-      const fallback = await supabase
-        .from('servidores')
-        .select(SERVIDOR_FIELDS)
-        .order('nome')
-      data = fallback.data
-      requestError = fallback.error
-      if (!requestError) setMigrationWarning(true)
-    }
-
-    if (requestError) {
-      console.error('useServidores:', requestError)
-      setError(erroMensagem(requestError))
-    }
-    setServidores(somenteLotacoesAtuais(data ?? []))
+    if (error) console.error('useServidores:', error)
+    setServidores(data ?? [])
     setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
-  return { servidores, loading, error, migrationWarning, reload: load }
+  return { servidores, loading, reload: load }
 }
 
 // ─── SERVIDOR ÚNICO ───────────────────────────────────────────────────────────
@@ -172,11 +60,11 @@ export function useServidor(id) {
         id, nome, nome_norm, status, funcao, tipo_vinculo,
         matricula, email, telefone, data_nascimento,
         endereco, formacao, regencia_h, htp_h, hti_h, observacoes,
-        lotacoes ( escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo) )
+        lotacoes ( escola_id, principal, escola:escolas(id, name, tipo) )
       `)
       .eq('id', id)
       .single()
-    setServidor(data ? somenteLotacoesAtuais([data])[0] : null)
+    setServidor(data)
     setLoading(false)
   }, [id])
 
@@ -188,52 +76,24 @@ export function useServidor(id) {
 
 export function useServidoresByEscola(escolaId) {
   const [servidores, setServidores] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [migrationWarning, setMigrationWarning] = useState(false)
+  const [loading, setLoading]       = useState(true)
 
   const load = useCallback(async () => {
     if (!escolaId) { setLoading(false); return }
     setLoading(true)
-    setError(null)
-    setMigrationWarning(false)
-
-    let { data, error: requestError } = await supabase
+    const { data } = await supabase
       .from('lotacoes')
       .select(`
         escola_id, principal,
         servidor:servidores (
           id, nome, status, funcao, tipo_vinculo, matricula,
-          lotacoes ( escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo) )
+          lotacoes ( escola:escolas(id, name, tipo) )
         )
       `)
       .eq('escola_id', escolaId)
-      .is('data_fim', null)
-
-    if (requestError) {
-      const fallback = await supabase
-        .from('lotacoes')
-        .select(`
-          escola_id, principal,
-          servidor:servidores (
-            id, nome, status, funcao, tipo_vinculo, matricula,
-            lotacoes ( escola:escolas(id, name, tipo) )
-          )
-        `)
-        .eq('escola_id', escolaId)
-      data = fallback.data
-      requestError = fallback.error
-      if (!requestError) setMigrationWarning(true)
-    }
-
-    if (requestError) setError(erroMensagem(requestError))
     setServidores(
       (data ?? [])
-        .map(l => l.servidor ? {
-          ...l.servidor,
-          lotacoes: (l.servidor.lotacoes ?? []).filter(lotacao => !lotacao.data_fim),
-          lotacaoAtual: l,
-        } : null)
+        .map(l => l.servidor ? { ...l.servidor, lotacaoAtual: l } : null)
         .filter(Boolean)
         .sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     )
@@ -241,38 +101,30 @@ export function useServidoresByEscola(escolaId) {
   }, [escolaId])
 
   useEffect(() => { load() }, [load])
-  return { servidores, loading, error, migrationWarning, reload: load }
+  return { servidores, loading, reload: load }
 }
 
 // ─── EFETIVIDADE ─────────────────────────────────────────────────────────────
 
 export function useEfetividade(escolaId, mesAno) {
-  const [efe, setEfe] = useState({})
+  const [efe, setEfe]       = useState({})
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!escolaId || !mesAno) {
-      setEfe({})
-      setError('')
-      return
-    }
-    setError('')
+    if (!escolaId || !mesAno) return
     supabase.from('efetividade').select('*')
       .eq('escola_id', escolaId).eq('mes_ano', mesAno)
-      .then(({ data, error: requestError }) => {
+      .then(({ data }) => {
         const map = {}
         ;(data ?? []).forEach(e => { map[e.servidor_id] = e })
         setEfe(map)
-        if (requestError) setError(erroMensagem(requestError))
       })
   }, [escolaId, mesAno])
 
   async function salvarEfe(servidorId, status, ocorrencia = null) {
     setSaving(true)
-    setError('')
     const { data: { user } } = await supabase.auth.getUser()
-    const { error: requestError } = await supabase.from('efetividade').upsert({
+    await supabase.from('efetividade').upsert({
       servidor_id: servidorId,
       escola_id: escolaId,
       mes_ano: mesAno,
@@ -280,51 +132,38 @@ export function useEfetividade(escolaId, mesAno) {
       registrado_por: user?.email,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'servidor_id,escola_id,mes_ano' })
-    if (requestError) setError(erroMensagem(requestError))
-    else setEfe(prev => ({ ...prev, [servidorId]: { status, ocorrencia } }))
+    setEfe(prev => ({ ...prev, [servidorId]: { status, ocorrencia } }))
     setSaving(false)
-    return { error: requestError }
   }
 
-  return { efe, salvarEfe, saving, error }
+  return { efe, salvarEfe, saving }
 }
 
 // ─── DASHBOARD STATS ─────────────────────────────────────────────────────────
 
 export function useDashboardStats() {
-  const [stats, setStats] = useState(null)
+  const [stats, setStats]     = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [migrationWarning, setMigrationWarning] = useState(false)
 
   useEffect(() => {
     async function load() {
-      const [servidoresResult, escolasResult, lotacoesResult] = await Promise.all([
+      const [
+        { count: totalServidores },
+        { count: totalEscolas },
+        { data: lots },
+      ] = await Promise.all([
         supabase.from('servidores').select('*', { count: 'exact', head: true }),
-        supabase.from('escolas').select('*', { count: 'exact', head: true }).neq('tipo', 'SMED'),
-        supabase.from('lotacoes').select('servidor_id, escola_id').is('data_fim', null),
+        supabase.from('escolas').select('*', { count: 'exact', head: true }),
+        supabase.from('lotacoes').select('servidor_id, escola_id'),
       ])
-
-      let lots = lotacoesResult.data
-      let lotacoesError = lotacoesResult.error
-      if (lotacoesError) {
-        const fallback = await supabase.from('lotacoes').select('servidor_id, escola_id')
-        lots = fallback.data
-        lotacoesError = fallback.error
-        if (!lotacoesError) setMigrationWarning(true)
-      }
-
-      const requestErrors = [servidoresResult.error, escolasResult.error, lotacoesError].filter(Boolean)
-      setError(requestErrors.length ? requestErrors.map(erroMensagem).join(' · ') : null)
-
       const byServ = {}
       ;(lots ?? []).forEach(l => {
         if (!byServ[l.servidor_id]) byServ[l.servidor_id] = new Set()
         byServ[l.servidor_id].add(l.escola_id)
       })
       setStats({
-        totalServidores: servidoresResult.count ?? 0,
-        totalEscolas: escolasResult.count ?? 0,
+        totalServidores: totalServidores ?? 0,
+        totalEscolas: totalEscolas ?? 0,
         duplos: Object.values(byServ).filter(s => s.size > 1).length,
       })
       setLoading(false)
@@ -332,7 +171,7 @@ export function useDashboardStats() {
     load()
   }, [])
 
-  return { stats, loading, error, migrationWarning }
+  return { stats, loading }
 }
 
 // ─── BUSCA GLOBAL ─────────────────────────────────────────────────────────────
@@ -347,7 +186,7 @@ export async function buscarGlobal(query) {
     return palavras.every(p => n.includes(p))
   }
 
-  const [servidoresResult, escolasResult] = await Promise.all([
+  const [{ data: servsRaw }, { data: escolasRaw }] = await Promise.all([
     supabase
       .from('servidores')
       .select(`
@@ -361,14 +200,9 @@ export async function buscarGlobal(query) {
       .ilike('name', `%${query.trim()}%`).limit(5),
   ])
 
-  const requestErrors = [servidoresResult.error, escolasResult.error].filter(Boolean)
   return {
-    servidores: (servidoresResult.data ?? [])
-      .map(s => ({ ...s, lotacoes: (s.lotacoes ?? []).filter(lotacao => !lotacao.data_fim) }))
-      .filter(s => matchAll(s.nome))
-      .slice(0, 12),
-    escolas: escolasResult.data ?? [],
-    error: requestErrors.length ? requestErrors.map(erroMensagem).join(' · ') : '',
+    servidores: (servsRaw ?? []).filter(s => matchAll(s.nome)).slice(0, 12),
+    escolas: escolasRaw ?? [],
   }
 }
 
@@ -388,6 +222,7 @@ export async function criarServidor(dados, escolaIds = []) {
       data_nascimento: dados.data_nascimento || null,
       endereco:        dados.endereco?.trim() || null,
       formacao:        dados.formacao?.trim() || null,
+      cpf:             dados.cpf?.trim() || null,
       observacoes:     dados.observacoes?.trim() || null,
     })
     .select('id').single()
@@ -395,14 +230,13 @@ export async function criarServidor(dados, escolaIds = []) {
   if (error) return { error }
 
   if (escolaIds.length) {
-    const { error: lotacoesError } = await supabase.from('lotacoes').insert(
+    await supabase.from('lotacoes').insert(
       escolaIds.map((eid, i) => ({
         servidor_id: srv.id,
         escola_id:   parseInt(eid),
         principal:   i === 0,
       }))
     )
-    if (lotacoesError) return { error: lotacoesError }
   }
   return { data: srv }
 }
@@ -421,68 +255,24 @@ export async function atualizarServidor(id, dados) {
       data_nascimento: dados.data_nascimento || null,
       endereco:        dados.endereco?.trim() || null,
       formacao:        dados.formacao?.trim() || null,
+      cpf:             dados.cpf?.trim() || null,
       observacoes:     dados.observacoes?.trim() || null,
     })
     .eq('id', id)
   return { error }
 }
 
-export async function atualizarLotacoes(servidorId, escolaIds = [], dataReferencia = hojeISO()) {
-  const { data, error } = await supabase.rpc('sincronizar_lotacoes', {
-    p_servidor_id: servidorId,
-    p_escola_ids: escolaIds.map(id => Number(id)).filter(Number.isInteger),
-    p_data_referencia: dataReferencia,
-  })
-  return { data, error }
-}
-
-export async function transferirServidorEscola({
-  servidorId,
-  escolaOrigemId,
-  escolaDestinoId,
-  dataTransferencia = hojeISO(),
-  motivo = null,
-}) {
-  const { data, error } = await supabase.rpc('transferir_servidor_escola', {
-    p_servidor_id: servidorId,
-    p_escola_origem_id: Number(escolaOrigemId),
-    p_escola_destino_id: Number(escolaDestinoId),
-    p_data_transferencia: dataTransferencia,
-    p_motivo: motivo?.trim() || null,
-  })
-  return { data, error }
-}
-
-export async function adicionarHistoricoLotacao({
-  servidorId,
-  escolaId,
-  dataInicio,
-  dataFim,
-  motivo = null,
-}) {
-  const { data, error } = await supabase.rpc('adicionar_historico_lotacao', {
-    p_servidor_id: servidorId,
-    p_escola_id: Number(escolaId),
-    p_data_inicio: dataInicio,
-    p_data_fim: dataFim,
-    p_motivo: motivo?.trim() || null,
-  })
-  return { data, error }
-}
-
-export async function editarHistoricoLotacao({
-  lotacaoId,
-  dataInicio,
-  dataFim,
-  motivo = null,
-}) {
-  const { data, error } = await supabase.rpc('editar_historico_lotacao', {
-    p_lotacao_id: Number(lotacaoId),
-    p_data_inicio: dataInicio,
-    p_data_fim: dataFim,
-    p_motivo: motivo?.trim() || null,
-  })
-  return { data, error }
+export async function atualizarLotacoes(servidorId, escolaIds = []) {
+  await supabase.from('lotacoes').delete().eq('servidor_id', servidorId)
+  if (!escolaIds.length) return { error: null }
+  const { error } = await supabase.from('lotacoes').insert(
+    escolaIds.map((eid, i) => ({
+      servidor_id: servidorId,
+      escola_id:   parseInt(eid),
+      principal:   i === 0,
+    }))
+  )
+  return { error }
 }
 
 export async function excluirServidor(id) {

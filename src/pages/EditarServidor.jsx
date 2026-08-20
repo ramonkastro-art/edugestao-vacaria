@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react'
 import {
   User, Mail, Phone, MapPin, Calendar, Briefcase,
   School, Hash, Save, Loader2, AlertCircle, CheckCircle2,
-  ArrowLeft, Trash2, X, GraduationCap, KeyRound,
+  ArrowLeft, Trash2, X, GraduationCap,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { atualizarServidor, atualizarLotacoes, excluirServidor, criarServidor } from '../hooks/useData'
 
 const FUNCOES = [
@@ -67,74 +66,26 @@ function SelectInput({ icon: Icon, disabled, children, ...props }) {
   )
 }
 function ConfirmModal({ nome, onConfirm, onCancel }) {
-  const [confirmacao, setConfirmacao] = useState('')
-  const [senha, setSenha] = useState('')
-  const [erro, setErro] = useState('')
-  const [verificando, setVerificando] = useState(false)
-
-  async function confirmarExclusao() {
-    const nomeEsperado = String(nome ?? '').trim().toLocaleLowerCase()
-    if (!nomeEsperado || confirmacao.trim().toLocaleLowerCase() !== nomeEsperado) {
-      setErro('Digite o nome completo exatamente como aparece acima.')
-      return
-    }
-    if (!senha) {
-      setErro('Digite sua senha para confirmar a exclusão.')
-      return
-    }
-
-    setVerificando(true)
-    setErro('')
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user?.email) {
-      setVerificando(false)
-      setErro('Não foi possível identificar o usuário autenticado.')
-      return
-    }
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: senha,
-    })
-    setVerificando(false)
-    if (authError) {
-      setErro('Senha incorreta. A exclusão não foi realizada.')
-      return
-    }
-    onConfirm()
-  }
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4" onClick={event => event.stopPropagation()}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
             <Trash2 size={18} className="text-red-600" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-800">Excluir servidor permanentemente?</p>
-            <p className="text-xs text-slate-500 mt-0.5">Esta ação não pode ser desfeita e remove também vínculos e efetividades relacionados.</p>
+            <p className="text-sm font-semibold text-slate-800">Confirmar exclusão</p>
+            <p className="text-xs text-slate-500 mt-0.5">Excluir <strong>{nome}</strong>? Não pode ser desfeito.</p>
           </div>
         </div>
-        <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-700">
-          Para continuar, confirme o servidor <strong>{nome || 'sem nome'}</strong> e informe sua senha de acesso.
-        </div>
-        <label className="block">
-          <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Digite o nome do servidor</span>
-          <input value={confirmacao} onChange={event => { setConfirmacao(event.target.value); setErro('') }} autoFocus placeholder={nome || 'Nome completo'} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none text-slate-800 focus:border-red-300" />
-        </label>
-        <label className="block">
-          <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Senha do usuário logado</span>
-          <div className="flex items-center gap-2 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-red-300">
-            <KeyRound size={15} className="text-slate-400 shrink-0" />
-            <input type="password" value={senha} onChange={event => { setSenha(event.target.value); setErro('') }} autoComplete="current-password" placeholder="Sua senha" className="flex-1 min-w-0 bg-transparent text-sm outline-none text-slate-800" />
-          </div>
-        </label>
-        {erro && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">{erro}</p>}
-        <div className="flex flex-col-reverse sm:flex-row gap-3">
-          <button onClick={onCancel} disabled={verificando} className="flex-1 py-2.5 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
-          <button onClick={confirmarExclusao} disabled={verificando} className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700 disabled:opacity-50">
-            {verificando ? <><Loader2 size={14} className="animate-spin" /> Verificando…</> : 'Confirmar exclusão'}
+        <div className="flex gap-3">
+          <button onClick={onCancel}
+            className="flex-1 py-2.5 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="flex-1 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700">
+            Excluir
           </button>
         </div>
       </div>
@@ -148,6 +99,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
     status:          servidor?.status          ?? 'Ativo',
     funcao:          servidor?.funcao          ?? '',
     tipo_vinculo:    servidor?.tipo_vinculo    ?? '',
+    cpf:             servidor?.cpf             ?? '',
     matricula:       servidor?.matricula       ?? '',
     email:           servidor?.email           ?? '',
     telefone:        servidor?.telefone        ?? '',
@@ -202,12 +154,11 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
       const res = await criarServidor(form, escolasSel)
       error = res.error
     } else {
-      const r1 = await atualizarServidor(servidor.id, form)
-      error = r1.error
-      if (!error && lotacoesMudaram) {
-        const r2 = await atualizarLotacoes(servidor.id, escolasSel)
-        error = r2.error
-      }
+      const [r1, r2] = await Promise.all([
+        atualizarServidor(servidor.id, form),
+        atualizarLotacoes(servidor.id, escolasSel),
+      ])
+      error = r1.error ?? r2.error
     }
 
     setSaving(false)
@@ -230,9 +181,6 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   const escolasVinculadas  = escolasSel
     .map(id => escolas.find(e => String(e.id) === id))
     .filter(Boolean)
-  const escolasOriginais = (servidor?.lotacoes ?? []).map(lotacao => String(lotacao.escola_id)).sort()
-  const escolasAtuaisOrdenadas = [...escolasSel].sort()
-  const lotacoesMudaram = JSON.stringify(escolasOriginais) !== JSON.stringify(escolasAtuaisOrdenadas)
 
   const TIPO_COLORS = {
     EMEI: 'bg-violet-50 text-violet-700 border-violet-200',
@@ -244,7 +192,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/25 backdrop-blur-sm"
       onClick={onClose}>
-      <div className="bg-white w-full md:max-w-lg md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[calc(100dvh-0.5rem)] md:max-h-[94vh] flex flex-col"
+      <div className="bg-white w-full md:max-w-lg md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col"
         onClick={e => e.stopPropagation()}>
 
         {/* Drag handle mobile */}
@@ -268,7 +216,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
         </div>
 
         {/* Corpo scrollável */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4 space-y-5">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
 
           {/* Dados pessoais */}
           <div className="space-y-3">
@@ -307,6 +255,11 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
                   onChange={e => set('email', e.target.value)}
                   placeholder="email@..." error={errors.email} />
               </div>
+            </div>
+            <div>
+              <FieldLabel>CPF</FieldLabel>
+              <Input icon={Hash} value={form.cpf}
+                onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" maxLength={14}/>
             </div>
             <div>
               <FieldLabel>Endereço</FieldLabel>
@@ -358,7 +311,6 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
             {/* Escolas vinculadas como tags */}
             <div>
               <FieldLabel>Escola(s) de lotação</FieldLabel>
-              {!isNovo && <p className="text-xs text-slate-400 mb-2">Remover uma escola encerra o vínculo e preserva o registro no histórico. Para uma mudança de unidade, prefira <strong className="font-medium text-slate-500">Transferir</strong>.</p>}
 
               {escolasVinculadas.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
@@ -429,15 +381,15 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
         </div>
 
         {/* Rodapé */}
-        <div className="modal-footer-safe px-4 sm:px-5 py-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 shrink-0">
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
           {!isNovo && (
             <button onClick={() => setConfirmDel(true)}
-              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 border border-red-200 text-red-600 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
-              <Trash2 size={14} /> <span>Excluir servidor</span>
+              className="flex items-center gap-1.5 px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
+              <Trash2 size={14} />
             </button>
           )}
           <button onClick={onClose}
-            className="w-full sm:w-auto px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            className="px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             Cancelar
           </button>
           <button onClick={handleSave} disabled={saving}
