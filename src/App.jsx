@@ -565,6 +565,27 @@ export default function App() {
     window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h)
   },[])
 
+  const modalAberto = searchOpen || Boolean(selectedServidor || transferServidor || historicoServidor || historicoLotacaoEdit || solicitacaoTransferenciaEdit || editServidor)
+
+  useEffect(() => {
+    const body = document.body
+    const raiz = document.documentElement
+    const overflowBodyAnterior = body.style.overflow
+    const overflowRaizAnterior = raiz.style.overflow
+    const paddingAnterior = body.style.paddingRight
+    if (modalAberto) {
+      const larguraBarra = window.innerWidth - raiz.clientWidth
+      body.style.overflow = 'hidden'
+      raiz.style.overflow = 'hidden'
+      if (larguraBarra > 0) body.style.paddingRight = `${larguraBarra}px`
+    }
+    return () => {
+      body.style.overflow = overflowBodyAnterior
+      raiz.style.overflow = overflowRaizAnterior
+      body.style.paddingRight = paddingAnterior
+    }
+  }, [modalAberto])
+
   if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={32} className="animate-spin text-slate-400"/></div>
   if(!user)return<LoginPage/>
 
@@ -572,9 +593,11 @@ export default function App() {
   function navigate(id){setView(id);setSelectedSchool(null)}
   function openNovoServidor(){setIsNovo(true);setEditServidor({});setSelectedServidor(null)}
   function openEditServidor(srv){
-    // Busca dados completos se vieram da busca (poucos campos)
+    // Busca dados completos se vieram da busca (poucos campos).
+    // Se o detalhe do servidor já estiver aberto, ele permanece montado atrás da edição.
     const completo = allServidores.find(s=>s.id===srv.id)??srv
-    setIsNovo(false);setEditServidor(completo);setSelectedServidor(null)
+    setIsNovo(false)
+    setEditServidor(completo)
   }
   function handleDataChanged(){
     setDataVersion(version => version + 1)
@@ -666,7 +689,7 @@ export default function App() {
 
       {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenServidor={s=>setSelectedServidor(s)}/>}
 
-      {selectedServidor&&!editServidor&&(
+      {selectedServidor&&(
         <ServidorModal
           servidor={selectedServidor}
           onClose={()=>setSelectedServidor(null)}
@@ -676,6 +699,7 @@ export default function App() {
           onEditHistorico={admin ? (lotacao => { setHistoricoLotacaoEdit({ servidor: selectedServidor, lotacao }); setSelectedServidor(null) }) : null}
           onAddSolicitacao={admin ? (srv => { setSolicitacaoTransferenciaEdit({ servidor: srv, solicitacao: null }); setSelectedServidor(null) }) : null}
           canEdit={admin}
+          suspended={Boolean(editServidor)}
         />
       )}
 
@@ -722,7 +746,7 @@ export default function App() {
           isNovo={isNovo}
           escolas={escolas}
           onClose={()=>{setEditServidor(null);setIsNovo(false)}}
-          onSaved={()=>{handleDataChanged();setEditServidor(null);setIsNovo(false)}}
+          onSaved={()=>{handleDataChanged();setEditServidor(null);setIsNovo(false);setSelectedServidor(null)}}
           onDeleted={()=>{handleDataChanged();setEditServidor(null);setSelectedServidor(null)}}
         />
       )}

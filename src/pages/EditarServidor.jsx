@@ -190,7 +190,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/25 backdrop-blur-sm"
+    <div className="fixed inset-0 z-[55] flex items-end md:items-center justify-center bg-black/25 backdrop-blur-sm"
       onClick={onClose}>
       <div className="bg-white w-full md:max-w-lg md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col"
         onClick={e => e.stopPropagation()}>

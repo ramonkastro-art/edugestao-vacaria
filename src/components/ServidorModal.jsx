@@ -34,6 +34,7 @@ export default function ServidorModal({
   onEditHistorico,
   onAddSolicitacao,
   canEdit,
+  suspended = false,
 }) {
   const [tab, setTab] = useState('escola') // 'escola' | 'dados' | 'historico'
   const [cadastro, setCadastro] = useState(null)
@@ -100,12 +101,13 @@ export default function ServidorModal({
   }, [tab, servidorId])
 
   useEffect(() => {
+    if (suspended) return undefined
     function fecharComEscape(event) {
       if (event.key === 'Escape') onClose?.()
     }
     window.addEventListener('keydown', fecharComEscape)
     return () => window.removeEventListener('keydown', fecharComEscape)
-  }, [onClose])
+  }, [onClose, suspended])
 
   // Quando abre a aba Dados, garante que temos todos os campos.
   useEffect(() => {
@@ -178,7 +180,7 @@ export default function ServidorModal({
             <div className="flex items-center gap-2 shrink-0">
               {canEdit && (
                 <button
-                  onClick={() => { onClose(); onEdit(servidor) }}
+                  onClick={() => onEdit(servidor)}
                   className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors"
                   title="Editar"
                 >
@@ -327,7 +329,7 @@ export default function ServidorModal({
                     <Info size={28} className="mx-auto mb-2 opacity-30" />
                     <p className="text-sm">Sem dados cadastrais registrados</p>
                     {canEdit && (
-                      <button onClick={() => { onClose(); onEdit(servidor) }}
+                      <button onClick={() => onEdit(servidor)}
                         className="mt-3 text-xs text-slate-500 underline">
                         Clique em Editar para preencher
                       </button>
