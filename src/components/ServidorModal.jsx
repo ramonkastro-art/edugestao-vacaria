@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   X, School, AlertCircle, GraduationCap, Briefcase,
   Phone, Mail, MapPin, Calendar, Hash, ArrowRightLeft,
@@ -19,16 +19,72 @@ function initials(name = '') {
 function Badge({ children, className = '' }) {
   return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${className}`}>{children}</span>
 }
+function formatarData(data) {
+  if (!data) return 'Não informada'
+  const [ano, mes, dia] = String(data).split('-')
+  return ano && mes && dia ? `${dia}/${mes}/${ano}` : 'Não informada'
+}
 
-export default function ServidorModal({ servidor, onClose, onEdit, canEdit }) {
+export default function ServidorModal({
+  servidor,
+  onClose,
+  onEdit,
+  onTransfer,
+  onAddHistorico,
+  onEditHistorico,
+  onAddSolicitacao,
+  canEdit,
+}) {
   const [tab, setTab] = useState('escola') // 'escola' | 'dados' | 'historico'
   const [cadastro, setCadastro] = useState(null)
   const [loadingCadastro, setLoadingCadastro] = useState(false)
+  const [historico, setHistorico] = useState(null)
+  const [loadingHistorico, setLoadingHistorico] = useState(false)
+  const [historicoErro, setHistoricoErro] = useState('')
+
+  const servidorId = servidor?.id
+  const lotacoesRecebidas = servidor?.lotacoes ?? []
+  const lotacoes = useMemo(() => [...lotacoesRecebidas].sort((a, b) => {
+    const aAtual = !a.data_fim
+    const bAtual = !b.data_fim
+    if (aAtual !== bAtual) return aAtual ? -1 : 1
+    return String(b.data_inicio ?? '').localeCompare(String(a.data_inicio ?? ''))
+  }), [lotacoesRecebidas])
+  const lotacoesExibidas = historico ?? lotacoes
+  const lotacoesAtuais = lotacoesExibidas.filter(lotacao => !lotacao.data_fim)
+  const escolas = lotacoesAtuais.map(l => l.escola).filter(Boolean)
+
+  useEffect(() => {
+    if (tab !== 'historico' || !servidorId) {
+      setLoadingHistorico(false)
+      return
+    }
+
+    let cancelada = false
+    setLoadingHistorico(true)
+    setHistoricoErro('')
+    supabase
+      .from('lotacoes')
+      .select('id, servidor_id, escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo)')
+      .eq('servidor_id', servidorId)
+      .order('data_fim', { ascending: true, nullsFirst: true })
+      .order('data_inicio', { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelada) return
+        if (error) {
+          console.error('ServidorModal histórico:', error)
+          setHistoricoErro(error.message || 'Não foi possível carregar o histórico.')
+          setHistorico(null)
+        } else {
+          setHistorico(data ?? [])
+        }
+        setLoadingHistorico(false)
+      })
+
+    return () => { cancelada = true }
+  }, [tab, servidorId])
 
   if (!servidor) return null
-
-  const lotacoes = servidor.lotacoes ?? []
-  const escolas = lotacoes.map(l => l.escola).filter(Boolean)
 
   // Quando abre aba dados, garante que temos todos os campos
   useEffect(() => {
@@ -148,6 +204,12 @@ export default function ServidorModal({ servidor, onClose, onEdit, canEdit }) {
                   </div>
                 </div>
               )}
+              {canEdit && (onTransfer || onAddSolicitacao) && (
+                <div className="grid grid-cols-1 gap-2 pt-1">
+                  {onTransfer && <button onClick={() => onTransfer(servidor)} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"><ArrowRightLeft size={14} /> Transferir para outra escola</button>}
+                  {onAddSolicitacao && <button onClick={() => onAddSolicitacao(servidor)} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50 transition-colors"><FileText size={14} /> Registrar pedido de transferência</button>}
+                </div>
+              )}
             </div>
           )}
 
@@ -238,10 +300,64 @@ export default function ServidorModal({ servidor, onClose, onEdit, canEdit }) {
 
           {/* ABA: Histórico */}
           {tab === 'historico' && (
-            <div className="text-center py-10 text-slate-400">
-              <Clock size={28} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Histórico de movimentações</p>
-              <p className="text-xs text-slate-300 mt-1">Em desenvolvimento</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Histórico de escolas</p>
+                  <p className="text-xs text-slate-400 mt-1">{lotacoesExibidas.length} vínculo{lotacoesExibidas.length === 1 ? '' : 's'} registrado{lotacoesExibidas.length === 1 ? '' : 's'}</p>
+                </div>
+                {canEdit && onAddHistorico && (
+                  <button onClick={() => onAddHistorico(servidor)} className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-violet-50 text-violet-700 text-xs font-medium hover:bg-violet-100 transition-colors">
+                    <FileText size={13} /> Adicionar histórico
+                  </button>
+                )}
+              </div>
+
+              {loadingHistorico ? (
+                <div className="flex items-center justify-center py-10 text-slate-400"><Loader2 size={20} className="animate-spin" /><span className="text-xs ml-2">Carregando histórico…</span></div>
+              ) : (
+                <>
+                  {historicoErro && <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-800"><p className="font-medium">Não foi possível consultar o histórico completo.</p><p className="mt-1 break-words">{historicoErro}</p><p className="mt-2 text-amber-700">Confirme se as migrações de histórico foram executadas no Supabase.</p></div>}
+                  {lotacoesExibidas.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                      <Clock size={28} className="mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Nenhum vínculo registrado</p>
+                      {canEdit && onAddHistorico && <p className="text-xs text-slate-300 mt-1">Adicione uma passagem anterior pela ação acima.</p>}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                  {lotacoesExibidas.map(lotacao => {
+                    const atual = !lotacao.data_fim
+                    const escola = lotacao.escola
+                    return (
+                      <div key={lotacao.id ?? `${lotacao.escola_id}-${lotacao.data_inicio}-${lotacao.data_fim ?? 'atual'}`} className={`p-3 rounded-2xl border ${atual ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${atual ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                            <School size={14} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-medium text-slate-800 leading-snug">{escola?.name || 'Escola não encontrada'}</p>
+                              <Badge className={atual ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-200 text-slate-600 border-slate-300'}>{atual ? 'Atual' : 'Encerrada'}</Badge>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {formatarData(lotacao.data_inicio)} {atual ? '· presente' : `· ${formatarData(lotacao.data_fim)}`}
+                            </p>
+                            {lotacao.motivo_saida && <p className="text-xs text-slate-400 mt-1">Motivo: {lotacao.motivo_saida}</p>}
+                            {canEdit && !atual && onEditHistorico && (
+                              <button onClick={() => onEditHistorico(lotacao)} className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-100 transition-colors">
+                                <Edit2 size={12} /> Editar histórico
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
