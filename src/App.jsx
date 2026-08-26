@@ -554,6 +554,7 @@ export default function App() {
   const [historicoLotacaoEdit,setHistoricoLotacaoEdit]=useState(null)
   const [solicitacaoTransferenciaEdit,setSolicitacaoTransferenciaEdit]=useState(null)
   const [editServidor,setEditServidor]=useState(null)
+  const [editarRetorno,setEditarRetorno]=useState(null)
   const [isNovo,setIsNovo]=useState(false)
   const [searchOpen,setSearchOpen]=useState(false)
   const [sidebarOpen,setSidebarOpen]=useState(true)
@@ -591,17 +592,46 @@ export default function App() {
 
   function handleSelectSchool(escola){setSelectedSchool(escola);setView('school-detail')}
   function navigate(id){setView(id);setSelectedSchool(null)}
-  function openNovoServidor(){setIsNovo(true);setEditServidor({});setSelectedServidor(null)}
+  function openNovoServidor(){
+    setEditarRetorno(null)
+    setIsNovo(true)
+    setEditServidor({})
+    setSelectedServidor(null)
+  }
   function openEditServidor(srv){
     // Busca dados completos se vieram da busca (poucos campos).
     // Se o detalhe do servidor já estiver aberto, ele permanece montado atrás da edição.
     const completo = allServidores.find(s=>s.id===srv.id)??srv
+    setEditarRetorno(selectedServidor?.id === srv.id ? selectedServidor : null)
     setIsNovo(false)
     setEditServidor(completo)
   }
-  function handleDataChanged(){
+  function fecharEdicao(restaurar = true){
+    const retorno = editarRetorno
+    setEditarRetorno(null)
+    setEditServidor(null)
+    setIsNovo(false)
+    if (restaurar && retorno) setSelectedServidor(retorno)
+  }
+  async function handleDataChanged(){
     setDataVersion(version => version + 1)
-    reloadServidores()
+    return reloadServidores()
+  }
+  function handleEditorSaved(){
+    const retorno = editarRetorno
+    setEditarRetorno(null)
+    setEditServidor(null)
+    setIsNovo(false)
+    if (!retorno) {
+      setSelectedServidor(null)
+      void handleDataChanged()
+      return
+    }
+    setSelectedServidor(retorno)
+    void handleDataChanged().then(lista => {
+      const atualizado = lista?.find(s => s.id === retorno.id)
+      if (atualizado) setSelectedServidor(atualizado)
+    })
   }
 
   const navItems=[
@@ -745,9 +775,9 @@ export default function App() {
           servidor={isNovo?null:editServidor}
           isNovo={isNovo}
           escolas={escolas}
-          onClose={()=>{setEditServidor(null);setIsNovo(false)}}
-          onSaved={()=>{handleDataChanged();setEditServidor(null);setIsNovo(false);setSelectedServidor(null)}}
-          onDeleted={()=>{handleDataChanged();setEditServidor(null);setSelectedServidor(null)}}
+          onClose={()=>fecharEdicao(true)}
+          onSaved={handleEditorSaved}
+          onDeleted={()=>{handleDataChanged();fecharEdicao(false);setSelectedServidor(null)}}
         />
       )}
     </div>

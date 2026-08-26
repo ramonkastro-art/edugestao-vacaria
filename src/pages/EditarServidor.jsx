@@ -76,8 +76,8 @@ function ConfirmModal({ nome, onConfirm, onCancel, loading = false, erro = '' })
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="confirmar-exclusao-title" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-      <form onSubmit={confirmar} className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="confirmar-exclusao-title" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={event => { event.stopPropagation(); if (event.target === event.currentTarget) onCancel?.() }}>
+      <form onSubmit={confirmar} onClick={event => event.stopPropagation()} className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
             <Trash2 size={18} className="text-red-600" />

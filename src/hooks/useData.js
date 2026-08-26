@@ -117,11 +117,14 @@ export function useServidores() {
       }
 
       if (result.error) console.error('useServidores:', result.error)
-      setServidores(result.data ?? [])
+      const lista = result.data ?? []
+      setServidores(lista)
       setError(result.error ? mensagemErro(result.error) : '')
+      return lista
     } catch (requestError) {
       setServidores([])
       setError(mensagemErro(requestError, 'Não foi possível carregar os servidores.'))
+      return []
     } finally {
       setLoading(false)
     }

@@ -48,13 +48,16 @@ Em um banco novo, execute o `schema_v2.sql` e depois as migrações necessárias
 | 5 | `migration_solicitacoes_transferencia.sql` | Cria solicitações administrativas e valida suas datas. |
 | 6 | `migration_security_hardening.sql` | Corrige a política recursiva de `user_profiles`. |
 | 7 | `migration_exclusao_segura_servidores.sql` | Habilita exclusão definitiva com aprovação, senha, auditoria e bloqueio por dependências. |
-| 8 | `migration_admin_policies.sql` | Opcional: completa permissões somente se as tabelas legadas existirem. |
+| 8 | `migration_rpc_security_hardening.sql` | Remove execução anônima das RPCs de negócio e mantém acesso autenticado. |
+| 9 | `migration_admin_policies.sql` | Opcional: completa permissões somente se as tabelas legadas existirem. |
 
 Não execute `migration_admin_policies.sql` em uma instalação v2 que não tenha as tabelas `professores` e `nomeacoes`. A migração `migration_historico_manual.sql` só é necessária quando o banco recebeu anteriormente uma versão antiga de `migration_historico_lotacoes.sql` que ainda não possuía a função de inclusão manual.
 
 Uma lotação sem `data_fim` é atual. Uma lotação encerrada permanece no banco com `data_fim` e `motivo_saida`; ela não deve ser excluída para alterar a escola atual. Os RPCs de sincronização e transferência encerram o vínculo anterior e criam o novo registro dentro da mesma operação.
 
-A exclusão definitiva de um servidor é reservada a duplicidades sem qualquer lotação, histórico, efetividade ou solicitação associada. Ela exige digitação exata do nome e reautenticação com a senha do usuário atual. Quando houver dependências, a operação é recusada e o cadastro deve ser mantido ou inativado, preservando a rastreabilidade.
+A exclusão definitiva de um servidor é reservada a duplicidades sem qualquer lotação, histórico, efetividade ou solicitação associada. Ela exige digitação exata do nome e reautenticação com a senha do usuário atual. Quando houver dependências, a operação é recusada e o cadastro deve ser mantido ou inativado, preservando a rastreabilidade. A migração `migration_rpc_security_hardening.sql` deve ser aplicada para impedir chamadas anônimas às RPCs de negócio.
+
+Ao abrir a edição ou a confirmação, o detalhe do servidor permanece no contexto. Cliques dentro dos formulários não fecham a edição; cancelar restaura o mesmo servidor e o mesmo estado de navegação.
 
 ## Segurança e dados pessoais
 
