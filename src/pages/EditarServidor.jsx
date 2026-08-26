@@ -4,7 +4,7 @@ import {
   School, Hash, Save, Loader2, AlertCircle, CheckCircle2,
   ArrowLeft, Trash2, X, GraduationCap,
 } from 'lucide-react'
-import { atualizarServidor, atualizarLotacoes, inativarServidor, criarServidor } from '../hooks/useData'
+import { atualizarServidor, atualizarLotacoes, excluirServidorDefinitivo, criarServidor } from '../hooks/useData'
 
 const FUNCOES = [
   { g: 'Docentes',              v: 'Professor(a) Ed. Básica I' },
@@ -65,30 +65,54 @@ function SelectInput({ icon: Icon, disabled, children, ...props }) {
     </div>
   )
 }
-function ConfirmModal({ nome, onConfirm, onCancel }) {
+function ConfirmModal({ nome, onConfirm, onCancel, loading = false, erro = '' }) {
+  const [senha, setSenha] = useState('')
+  const [nomeConfirmado, setNomeConfirmado] = useState('')
+  const podeExcluir = nomeConfirmado.trim() === nome.trim() && senha.length > 0 && !loading
+
+  function confirmar(event) {
+    event.preventDefault()
+    if (podeExcluir) onConfirm(senha)
+  }
+
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="confirmar-inativacao-title" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="confirmar-exclusao-title" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+      <form onSubmit={confirmar} className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
             <Trash2 size={18} className="text-red-600" />
           </div>
           <div>
-            <p id="confirmar-inativacao-title" className="text-sm font-semibold text-slate-800">Inativar cadastro</p>
-            <p className="text-xs text-slate-500 mt-0.5">Inativar <strong>{nome}</strong>? O histórico será preservado.</p>
+            <p id="confirmar-exclusao-title" className="text-sm font-semibold text-slate-800">Excluir definitivamente</p>
+            <p className="text-xs text-slate-500 mt-0.5">Esta ação não pode ser desfeita e só é permitida sem vínculos associados.</p>
           </div>
         </div>
+
+        <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-800">
+          Para confirmar, digite exatamente o nome <strong>{nome}</strong> e informe sua senha atual.
+        </div>
+
+        <label className="block">
+          <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Nome do funcionário</span>
+          <input autoFocus value={nomeConfirmado} onChange={event => setNomeConfirmado(event.target.value)} autoComplete="off" className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none text-slate-800 focus:border-red-400" placeholder={nome} />
+        </label>
+
+        <label className="block">
+          <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Senha do usuário atual</span>
+          <input type="password" value={senha} onChange={event => setSenha(event.target.value)} autoComplete="current-password" className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none text-slate-800 focus:border-red-400" placeholder="Digite sua senha" />
+        </label>
+
+        {erro && <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">{erro}</p>}
+
         <div className="flex gap-3">
-          <button onClick={onCancel}
-            className="flex-1 py-2.5 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50">
+          <button type="button" onClick={onCancel} disabled={loading} className="flex-1 py-2.5 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
             Cancelar
           </button>
-          <button onClick={onConfirm}
-            className="flex-1 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700">
-            Inativar
+          <button type="submit" disabled={!podeExcluir} className="flex-1 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+            {loading ? 'Excluindo…' : 'Excluir definitivamente'}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   )
 }
@@ -119,6 +143,8 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   const [erro, setErro]       = useState('')
   const [errors, setErrors]   = useState({})
   const [confirmDel, setConfirmDel] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   function set(k, v) {
     setForm(p => ({ ...p, [k]: v }))
@@ -170,11 +196,19 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
     }
   }
 
-  async function handleDelete() {
-    setConfirmDel(false)
-    const { error } = await inativarServidor(servidor.id)
-    if (!error) { onDeleted?.(); onClose?.() }
-    else setErro('Erro ao inativar: ' + error.message)
+  async function handleDelete(senha) {
+    setDeleting(true)
+    setDeleteError('')
+    const { error } = await excluirServidorDefinitivo(servidor.id, senha)
+    if (!error) {
+      setConfirmDel(false)
+      setDeleting(false)
+      onDeleted?.()
+      onClose?.()
+      return
+    }
+    setDeleting(false)
+    setDeleteError(error.message || 'Não foi possível excluir o funcionário.')
   }
 
   const escolasDisponiveis = escolas.filter(e => !escolasSel.includes(String(e.id)))
@@ -383,7 +417,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
         {/* Rodapé */}
         <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
           {!isNovo && (
-            <button type="button" onClick={() => setConfirmDel(true)} aria-label="Inativar servidor" title="Inativar servidor"
+            <button type="button" onClick={() => { setDeleteError(''); setConfirmDel(true) }} aria-label="Excluir definitivamente" title="Excluir definitivamente"
               className="flex items-center gap-1.5 px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
               <Trash2 size={14} />
             </button>
@@ -403,7 +437,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
       </div>
 
       {confirmDel && (
-        <ConfirmModal nome={form.nome} onConfirm={handleDelete} onCancel={() => setConfirmDel(false)} />
+        <ConfirmModal nome={form.nome} onConfirm={handleDelete} onCancel={() => { if (!deleting) setConfirmDel(false) }} loading={deleting} erro={deleteError} />
       )}
     </div>
   )

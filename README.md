@@ -47,11 +47,14 @@ Em um banco novo, execute o `schema_v2.sql` e depois as migrações necessárias
 | 4 | `migration_proteger_historico.sql` | Impede exclusões em cascata de servidores e escolas com histórico. |
 | 5 | `migration_solicitacoes_transferencia.sql` | Cria solicitações administrativas e valida suas datas. |
 | 6 | `migration_security_hardening.sql` | Corrige a política recursiva de `user_profiles`. |
-| 7 | `migration_admin_policies.sql` | Opcional: completa permissões somente se as tabelas legadas existirem. |
+| 7 | `migration_exclusao_segura_servidores.sql` | Habilita exclusão definitiva com aprovação, senha, auditoria e bloqueio por dependências. |
+| 8 | `migration_admin_policies.sql` | Opcional: completa permissões somente se as tabelas legadas existirem. |
 
 Não execute `migration_admin_policies.sql` em uma instalação v2 que não tenha as tabelas `professores` e `nomeacoes`. A migração `migration_historico_manual.sql` só é necessária quando o banco recebeu anteriormente uma versão antiga de `migration_historico_lotacoes.sql` que ainda não possuía a função de inclusão manual.
 
 Uma lotação sem `data_fim` é atual. Uma lotação encerrada permanece no banco com `data_fim` e `motivo_saida`; ela não deve ser excluída para alterar a escola atual. Os RPCs de sincronização e transferência encerram o vínculo anterior e criam o novo registro dentro da mesma operação.
+
+A exclusão definitiva de um servidor é reservada a duplicidades sem qualquer lotação, histórico, efetividade ou solicitação associada. Ela exige digitação exata do nome e reautenticação com a senha do usuário atual. Quando houver dependências, a operação é recusada e o cadastro deve ser mantido ou inativado, preservando a rastreabilidade.
 
 ## Segurança e dados pessoais
 

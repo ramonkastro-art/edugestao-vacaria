@@ -565,9 +565,33 @@ export async function inativarServidor(id) {
   }
 }
 
-// Compatibilidade com telas antigas: nunca executa DELETE físico.
-export async function excluirServidor(id) {
-  return inativarServidor(id)
+export async function excluirServidorDefinitivo(id, senha) {
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    if (userError || !userData?.user?.email) {
+      return { error: new Error('Não foi possível confirmar o usuário atual.') }
+    }
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: userData.user.email,
+      password: senha,
+    })
+    if (authError) {
+      return { error: new Error('Senha inválida. A exclusão não foi realizada.') }
+    }
+
+    const { data, error } = await supabase.rpc('excluir_servidor_definitivo', {
+      p_servidor_id: id,
+    })
+    return { data, error }
+  } catch (error) {
+    return { error: comoErro(error, 'Não foi possível excluir o servidor.') }
+  }
+}
+
+// Compatibilidade com telas antigas: a exclusão exige senha e aprovação no banco.
+export async function excluirServidor(id, senha) {
+  return excluirServidorDefinitivo(id, senha)
 }
 
 // ─── SOLICITAÇÕES DE TRANSFERÊNCIA ────────────────────────────────────────────
