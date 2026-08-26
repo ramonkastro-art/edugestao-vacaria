@@ -93,7 +93,7 @@ function isAdmin(profile) {
 
 function BottomNav({ currentView, onNavigate, canCreate }) {
   const items = [
-    {id:'dashboard', label:'Início',    icon:Home},
+    {id:'dashboard', label:'Visão Geral', icon:Home},
     {id:'schools',   label:'Unidades', icon:School},
     {id:'servidores',label:'Servidores',icon:Users},
     {id:'efe',       label:'EFE',      icon:CheckCircle2},
@@ -104,7 +104,7 @@ function BottomNav({ currentView, onNavigate, canCreate }) {
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-100 flex md:hidden safe-area-bottom">
       {items.map(({id,label,icon:Icon})=>(
         <button key={id} onClick={()=>onNavigate(id)}
-          className={`flex-1 flex flex-col items-center gap-0.5 pt-2 pb-3 transition-colors ${activeId===id?'text-slate-900':'text-slate-400'}`}>
+          className={`flex-1 flex flex-col items-center gap-0.5 pt-2 pb-3 transition-colors ${activeId===id?'text-[#0f789c]':'text-slate-400'}`}>
           <Icon size={21} strokeWidth={activeId===id?2.5:1.8}/>
           <span className="text-[10px] leading-none font-medium">{label}</span>
         </button>
@@ -207,9 +207,9 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenServidor }) {
   )
 }
 
-// ─── DASHBOARD ───────────────────────────────────────────────────────────────
+// ─── VISÃO GERAL ───────────────────────────────────────────────────────────────
 
-function Dashboard({ onSelectSchool }) {
+function VisaoGeral({ onSelectSchool }) {
   const {stats,loading,error:statsError,migrationWarning:statsMigrationWarning}=useDashboardStats()
   const {escolas,error:escolasError}=useEscolas()
   if(loading)return<Spinner/>
@@ -222,10 +222,10 @@ function Dashboard({ onSelectSchool }) {
       <DataBanner error={statsError || escolasError} migrationWarning={statsMigrationWarning}/>
       <div className="grid grid-cols-2 gap-3">
         {[
-          {label:'Escolas',     val:stats?.totalEscolas,    icon:School,        bg:'bg-slate-50',  text:'text-slate-800',  ib:'bg-slate-200 text-slate-600'},
-          {label:'Servidores',  val:stats?.totalServidores, icon:Users,         bg:'bg-blue-50',   text:'text-blue-800',   ib:'bg-blue-200 text-blue-700'},
-          {label:'Duplas Lot.', val:stats?.duplos,          icon:Briefcase,     bg:'bg-amber-50',  text:'text-amber-800',  ib:'bg-amber-200 text-amber-700'},
-          {label:'Mês vigente', val:mesAnoLabel(mesAnoAtual()).split('/')[0].trim(), icon:CheckCircle2, bg:'bg-emerald-50', text:'text-emerald-800', ib:'bg-emerald-200 text-emerald-700'},
+          {label:'Escolas',     val:stats?.totalEscolas,    icon:School,        bg:'brand-card-neutral', text:'text-[#20234f]', ib:'bg-white/70 text-[#0f789c]'},
+          {label:'Servidores',  val:stats?.totalServidores, icon:Users,         bg:'brand-card-blue', text:'text-[#0b5e7d]', ib:'bg-white/70 text-[#0f789c]'},
+          {label:'Duplas Lot.', val:stats?.duplos,          icon:Briefcase,     bg:'brand-card-orange', text:'text-[#9a4f08]', ib:'bg-white/70 text-[#d96f0d]'},
+          {label:'Mês vigente', val:mesAnoLabel(mesAnoAtual()).split('/')[0].trim(), icon:CheckCircle2, bg:'brand-card-green', text:'text-[#287346]', ib:'bg-white/70 text-[#3c9c5a]'},
         ].map(({label,val,icon:Icon,bg,text,ib})=>(
           <div key={label} className={`${bg} rounded-2xl p-4`}>
             <div className={`w-8 h-8 rounded-xl ${ib} flex items-center justify-center mb-2`}><Icon size={15}/></div>
@@ -410,7 +410,7 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
         <div><h1 className="text-xl font-semibold text-slate-900">Servidores</h1><p className="text-sm text-slate-500 mt-0.5">{servidores.length} cadastrados · rede municipal</p></div>
         <div className="flex gap-2 ml-auto">
           <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><RefreshCw size={16} className="text-slate-500"/></button>
-          <button onClick={onNovoServidor} className="flex items-center gap-1.5 px-3 py-2 bg-slate-950 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">
+          <button onClick={onNovoServidor} className="flex items-center gap-1.5 px-3 py-2 brand-primary text-white rounded-xl text-sm font-medium transition-colors">
             <UserPlus size={15}/> Novo
           </button>
         </div>
@@ -486,6 +486,7 @@ function EfeModule({ onOpenServidor }) {
   const filtered=useMemo(()=>{
     const q=search.toLowerCase()
     return servidores.filter(s=>
+      s.status !== 'Inativo' &&
       (search===''||s.nome.toLowerCase().includes(q))&&
       (escolaFiltro===''||(s.lotacoes??[]).some(l=>!l.data_fim&&String(l.escola_id)===escolaFiltro))
     ).slice(0,100)
@@ -587,7 +588,7 @@ export default function App() {
     }
   }, [modalAberto])
 
-  if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={32} className="animate-spin text-slate-400"/></div>
+  if(loading)return<div className="min-h-screen brand-page-bg flex items-center justify-center"><Loader2 size={32} className="animate-spin text-slate-400"/></div>
   if(!user)return<LoginPage/>
 
   function handleSelectSchool(escola){setSelectedSchool(escola);setView('school-detail')}
@@ -635,7 +636,7 @@ export default function App() {
   }
 
   const navItems=[
-    {id:'dashboard',  label:'Dashboard',  icon:Home},
+    {id:'dashboard',  label:'Visão Geral', icon:Home},
     {id:'schools',    label:'Unidades',   icon:School},
     {id:'servidores', label:'Servidores', icon:Users},
     {id:'efe',        label:'Efetividade',icon:CheckCircle2},
@@ -646,12 +647,12 @@ export default function App() {
   const mainML=sidebarOpen?'md:ml-56':'md:ml-16'
 
   return (
-    <div className="min-h-screen bg-slate-50" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
+    <div className="min-h-screen brand-page-bg" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
 
       {/* Sidebar desktop */}
       <aside className={`${sideW} hidden md:flex flex-col bg-white border-r border-slate-100 fixed top-0 left-0 h-screen z-30 transition-all duration-200`}>
         <div className="p-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl brand-sidebar-mark flex items-center justify-center shrink-0">
             <GraduationCap size={15} className="text-white"/>
           </div>
           {sidebarOpen&&<div className="overflow-hidden"><p className="text-sm font-semibold text-slate-800 leading-tight">EduGestão</p><p className="text-xs text-slate-400 leading-tight">Vacaria · RS</p></div>}
@@ -659,7 +660,7 @@ export default function App() {
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {navItems.map(({id,label,icon:Icon})=>(
             <button key={id} onClick={()=>navigate(id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentNavId===id?'bg-slate-950 text-white font-medium':'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentNavId===id?'brand-nav-active text-white font-medium':'text-slate-500 hover:bg-[#eef6f7] hover:text-[#0b5e7d]'}`}>
               <Icon size={17} className="shrink-0"/>{sidebarOpen&&<span>{label}</span>}
             </button>
           ))}
@@ -681,21 +682,21 @@ export default function App() {
 
       {/* Main */}
       <div className={`flex flex-col min-h-screen ${mainML} md:transition-all md:duration-200`}>
-        <header className="h-14 bg-white border-b border-slate-100 flex items-center gap-2 px-3 sm:px-4 shrink-0 sticky top-0 z-20">
+        <header className="h-14 bg-white brand-header flex items-center gap-2 px-3 sm:px-4 shrink-0 sticky top-0 z-20">
           <button onClick={()=>setSidebarOpen(!sidebarOpen)} className="hidden md:flex p-2 rounded-xl hover:bg-slate-100 transition-colors">
             <Menu size={17} className="text-slate-500"/>
           </button>
           <div className="flex md:hidden items-center gap-2 shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-slate-950 flex items-center justify-center"><GraduationCap size={13} className="text-white"/></div>
+            <div className="w-7 h-7 rounded-lg brand-sidebar-mark flex items-center justify-center"><GraduationCap size={13} className="text-white"/></div>
             <span className="text-sm font-semibold text-slate-800">EduGestão</span>
           </div>
           <button onClick={()=>setSearchOpen(true)}
-            className="flex-1 flex items-center gap-2 px-3 py-2 bg-slate-100 rounded-xl text-sm text-slate-400 hover:bg-slate-200 transition-colors min-w-0">
+            className="flex-1 flex items-center gap-2 px-3 py-2 brand-search rounded-xl text-sm text-slate-500 hover:bg-slate-200 transition-colors min-w-0">
             <Search size={14} className="shrink-0"/>
             <span className="flex-1 text-left truncate text-xs sm:text-sm">Buscar servidor ou escola...</span>
             <kbd className="hidden sm:inline text-xs bg-white border border-slate-200 px-1.5 py-0.5 rounded-md font-mono shrink-0">⌘K</kbd>
           </button>
-          <div className="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center text-xs font-semibold text-white shrink-0">
+          <div className="w-8 h-8 rounded-xl brand-sidebar-mark flex items-center justify-center text-xs font-semibold text-white shrink-0">
             {initials(profile?.nome||user?.email||'U')}
           </div>
         </header>
@@ -706,7 +707,7 @@ export default function App() {
               <p className="text-xs mt-1">A visualização pode funcionar, mas os botões de edição ficam bloqueados. Crie ou ajuste o registro deste usuário em `user_profiles` no Supabase. {profileError && `Detalhe: ${profileError}`}</p>
             </div>
           )}
-          {view==='dashboard'&&<Dashboard onSelectSchool={handleSelectSchool}/>}
+          {view==='dashboard'&&<VisaoGeral onSelectSchool={handleSelectSchool}/>}
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
           {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={admin} refreshToken={dataVersion}/>}

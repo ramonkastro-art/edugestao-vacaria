@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import {
   User, Mail, Phone, MapPin, Calendar, Briefcase,
   School, Hash, Save, Loader2, AlertCircle, CheckCircle2,
-  ArrowLeft, Trash2, X, GraduationCap,
+  ArrowLeft, Trash2, X, UserMinus, GraduationCap,
 } from 'lucide-react'
-import { atualizarServidor, atualizarLotacoes, excluirServidorDefinitivo, criarServidor } from '../hooks/useData'
+import { atualizarServidor, atualizarLotacoes, inativarServidor, excluirServidorDefinitivo, criarServidor } from '../hooks/useData'
 
 const FUNCOES = [
   { g: 'Docentes',              v: 'Professor(a) Ed. Básica I' },
@@ -139,6 +139,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   )
 
   const [saving, setSaving]   = useState(false)
+  const [inativando, setInativando] = useState(false)
   const [saved, setSaved]     = useState(false)
   const [erro, setErro]       = useState('')
   const [errors, setErrors]   = useState({})
@@ -175,13 +176,14 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
     if (!validate()) return
     setSaving(true); setErro(''); setSaved(false)
 
+    const dadosParaSalvar = form
     let error
     if (isNovo) {
-      const res = await criarServidor(form, escolasSel)
+      const res = await criarServidor(dadosParaSalvar, escolasSel)
       error = res.error
     } else {
       const [r1, r2] = await Promise.all([
-        atualizarServidor(servidor.id, form),
+        atualizarServidor(servidor.id, dadosParaSalvar),
         atualizarLotacoes(servidor.id, escolasSel),
       ])
       error = r1.error ?? r2.error
@@ -192,8 +194,23 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
       setErro(error.message || 'Erro ao salvar. Tente novamente.')
     } else {
       setSaved(true)
-      setTimeout(() => { onSaved?.(); onClose?.() }, 800)
+      setTimeout(() => { onSaved ? onSaved() : onClose?.() }, 800)
     }
+  }
+
+  async function handleInativar() {
+    if (isNovo || !servidor?.id) return
+    setInativando(true)
+    setErro('')
+    setSaved(false)
+    const { error } = await inativarServidor(servidor.id)
+    setInativando(false)
+    if (error) {
+      setErro(error.message || 'Não foi possível inativar o servidor.')
+      return
+    }
+    setSaved(true)
+    setTimeout(() => { onSaved ? onSaved() : onClose?.() }, 800)
   }
 
   async function handleDelete(senha) {
@@ -415,19 +432,25 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
         </div>
 
         {/* Rodapé */}
-        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-2 sm:gap-3 shrink-0">
+          {!isNovo && form.status !== 'Inativo' && (
+            <button type="button" onClick={handleInativar} disabled={saving || inativando} aria-label="Inativar servidor" title="Inativar servidor"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-3 border border-amber-200 text-amber-700 rounded-2xl text-sm font-medium hover:bg-amber-50 transition-colors disabled:opacity-50">
+              {inativando ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}<span className="hidden sm:inline">{inativando ? 'Inativando…' : 'Inativar'}</span>
+            </button>
+          )}
           {!isNovo && (
             <button type="button" onClick={() => { setDeleteError(''); setConfirmDel(true) }} aria-label="Excluir definitivamente" title="Excluir definitivamente"
-              className="flex items-center gap-1.5 px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
-              <Trash2 size={14} />
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
+              <Trash2 size={14} /><span className="hidden sm:inline">Excluir</span>
             </button>
           )}
           <button onClick={onClose}
-            className="px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            className="px-3 sm:px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             Cancelar
           </button>
           <button onClick={handleSave} disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 active:scale-95 transition-all">
+            className="flex-1 flex items-center justify-center gap-2 py-3 brand-primary text-white rounded-2xl text-sm font-medium disabled:opacity-50 active:scale-95 transition-all">
             {saving
               ? <><Loader2 size={14} className="animate-spin" /> Salvando…</>
               : <><Save size={14} /> {isNovo ? 'Criar servidor' : 'Salvar alterações'}</>

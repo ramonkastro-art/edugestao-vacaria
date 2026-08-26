@@ -130,7 +130,7 @@ export default function TransferirLotacaoModal({ servidor, escolas = [], onClose
 
         <div className="modal-footer-safe px-5 py-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 shrink-0">
           <button onClick={onClose} disabled={saving} className="w-full sm:w-auto px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
-          <button onClick={handleTransferir} disabled={saving || saved || !origemId || destinos.length === 0} className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 active:scale-[0.98] transition-all">
+          <button onClick={handleTransferir} disabled={saving || saved || !origemId || destinos.length === 0} className="flex-1 flex items-center justify-center gap-2 py-3 brand-primary text-white rounded-2xl text-sm font-medium disabled:opacity-50 active:scale-[0.98] transition-all">
             {saving ? <><Loader2 size={14} className="animate-spin" /> Registrando…</> : <><ArrowRightLeft size={14} /> Confirmar transferência</>}
           </button>
         </div>

@@ -6,8 +6,18 @@
 
 * { font-family: 'DM Sans', system-ui, sans-serif; }
 
-html { min-height: 100%; background: #f8fafc; }
-body { min-height: 100dvh; overscroll-behavior-y: none; -webkit-font-smoothing: antialiased; }
+:root {
+  --brand-navy: #20234f;
+  --brand-blue: #0f789c;
+  --brand-blue-deep: #0b5e7d;
+  --brand-orange: #f28b16;
+  --brand-orange-deep: #d96f0d;
+  --brand-green: #5db873;
+  --brand-cream: #f5f6f0;
+}
+
+html { min-height: 100%; background: var(--brand-cream); }
+body { min-height: 100dvh; overscroll-behavior-y: none; -webkit-font-smoothing: antialiased; background: var(--brand-cream); }
 button, a, select, input, textarea { -webkit-tap-highlight-color: transparent; }
 
 .pb-safe  { padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -18,6 +28,43 @@ button, a, select, input, textarea { -webkit-tap-highlight-color: transparent; }
 ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
 
+.brand-page-bg {
+  background: linear-gradient(135deg, #f7f8f3 0%, #f1f5f3 52%, #eef6f7 100%);
+}
+
+.brand-header {
+  border-bottom: 3px solid var(--brand-orange);
+  box-shadow: 0 4px 18px rgba(32, 35, 79, 0.05);
+}
+
+.brand-sidebar-mark {
+  background: linear-gradient(145deg, var(--brand-navy) 0 43%, var(--brand-blue) 43% 73%, var(--brand-orange) 73% 100%);
+  box-shadow: 0 5px 12px rgba(15, 120, 156, 0.22);
+}
+
+.brand-nav-active {
+  background: linear-gradient(135deg, var(--brand-navy), #2d3268);
+  box-shadow: 0 5px 12px rgba(32, 35, 79, 0.14);
+}
+
+.brand-primary {
+  background: linear-gradient(135deg, var(--brand-blue), var(--brand-blue-deep));
+  box-shadow: 0 6px 14px rgba(15, 120, 156, 0.18);
+}
+
+.brand-primary:hover { background: linear-gradient(135deg, #1286ad, var(--brand-blue-deep)); }
+
+.brand-hero {
+  background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-blue-deep) 68%, var(--brand-blue) 100%);
+}
+
+.brand-search { background: rgba(15, 120, 156, 0.08); }
+.brand-search:hover { background: rgba(15, 120, 156, 0.13); }
+
+.brand-card-neutral { background: linear-gradient(135deg, #ffffff, #f2f5f1); border: 1px solid #e4e9e2; }
+.brand-card-blue { background: linear-gradient(135deg, #e7f5f7, #d9eef2); border: 1px solid #c7e5ea; }
+.brand-card-orange { background: linear-gradient(135deg, #fff3df, #ffe8c6); border: 1px solid #f8d6a5; }
+.brand-card-green { background: linear-gradient(135deg, #eaf7ed, #dff2e4); border: 1px solid #cbe7d2; }
 
 /* Ajustes de ergonomia para celulares e modo instalado */
 html { -webkit-text-size-adjust: 100%; }
@@ -43,7 +90,7 @@ button, a, select { touch-action: manipulation; }
 
 /* Acessibilidade: foco consistente para teclado e tecnologias assistivas. */
 :where(button, a, input, select, textarea):focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.45);
+  outline: 3px solid rgba(15, 120, 156, 0.5);
   outline-offset: 2px;
 }
 

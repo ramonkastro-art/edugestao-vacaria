@@ -57,7 +57,9 @@ Uma lotação sem `data_fim` é atual. Uma lotação encerrada permanece no banc
 
 A exclusão definitiva de um servidor é reservada a duplicidades sem qualquer lotação, histórico, efetividade ou solicitação associada. Ela exige digitação exata do nome e reautenticação com a senha do usuário atual. Quando houver dependências, a operação é recusada e o cadastro deve ser mantido ou inativado, preservando a rastreabilidade. A migração `migration_rpc_security_hardening.sql` deve ser aplicada para impedir chamadas anônimas às RPCs de negócio.
 
-Ao abrir a edição ou a confirmação, o detalhe do servidor permanece no contexto. Cliques dentro dos formulários não fecham a edição; cancelar restaura o mesmo servidor e o mesmo estado de navegação.
+Ao abrir a edição ou a confirmação, o detalhe do servidor permanece no contexto. Cliques dentro dos formulários não fecham a edição; cancelar restaura o mesmo servidor e o mesmo estado de navegação. A ação **Inativar** altera somente o status do servidor, preserva suas lotações e o histórico, e faz com que ele deixe de aparecer nos indicadores e quadros de servidores ativos. O registro continua acessível pelo filtro `Inativo`.
+
+A antiga área `Dashboard` é apresentada na interface como **Visão Geral**, pois funciona como a tela de resumo da rede.
 
 ## Segurança e dados pessoais
 
@@ -65,9 +67,15 @@ As tabelas de negócio usam RLS. A autorização de edição depende de uma linh
 
 O JSON legado com nomes e lotações foi removido de `src/` porque não era importado pela aplicação e continha dados pessoais. Os dados de produção devem permanecer no Supabase. Os arquivos `seed.sql` e `seed_v2.sql` são apenas referências de inicialização; revise e redija os dados antes de armazená-los em repositório público ou executar em produção.
 
+## Identidade visual
+
+A interface utiliza uma paleta inspirada na identidade visual institucional da referência, sem reproduzir seu layout: azul-marinho para marca e navegação, azul-petróleo para ações principais, laranja para assinatura e atenção, verde para estados positivos e um fundo marfim para suavizar a área de trabalho. Os tokens ficam centralizados em `src/index.css`, nas classes `brand-*`, para que novas telas mantenham o mesmo padrão.
+
+A aplicação usa a identidade nos cartões da **Visão Geral**, nos estados ativos da navegação, no cabeçalho, no login, nos perfis de servidores e nos botões principais de edição, histórico, transferência e relatórios.
+
 ## Funcionalidades
 
-- **Dashboard** com escolas, servidores e duplas de lotação ativa;
+- **Visão Geral** com escolas, servidores não inativos e duplas de lotação ativa;
 - **Unidades** com filtro por modalidade e quadro atual;
 - **Servidores** com busca, filtro de escola e status;
 - **Perfil do servidor** com dados, vínculos atuais e histórico de escolas;

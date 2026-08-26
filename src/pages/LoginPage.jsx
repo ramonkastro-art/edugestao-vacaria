@@ -22,11 +22,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen brand-page-bg flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-slate-950 flex items-center justify-center mx-auto mb-4">
+          <div className="w-14 h-14 rounded-2xl brand-sidebar-mark flex items-center justify-center mx-auto mb-4">
             <GraduationCap size={26} className="text-white" />
           </div>
           <h1 className="text-2xl font-semibold text-slate-900">EduGestão</h1>
@@ -34,7 +34,7 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-8">
+        <div className="bg-white rounded-3xl shadow-[0_18px_45px_rgba(32,35,79,0.10)] border border-[#e4e9e2] p-8">
           <h2 className="text-lg font-semibold text-slate-800 mb-6">Entrar</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,7 +94,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-slate-950 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+              className="w-full flex items-center justify-center gap-2 py-3 brand-primary text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : null}
               {loading ? 'Entrando...' : 'Entrar'}

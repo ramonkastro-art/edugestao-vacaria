@@ -218,7 +218,7 @@ export function useServidoresByEscola(escolaId) {
           const servidor = Array.isArray(lotacao.servidor) ? lotacao.servidor[0] : lotacao.servidor
           return servidor ? { ...servidor, lotacaoAtual: lotacao } : null
         })
-        .filter(Boolean)
+        .filter(servidor => servidor && servidor.status !== 'Inativo')
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
       setServidores(lista)
@@ -318,7 +318,7 @@ export function useDashboardStats() {
     async function load() {
       try {
         const [servidoresResult, escolasResult] = await Promise.all([
-          supabase.from('servidores').select('*', { count: 'exact', head: true }),
+          supabase.from('servidores').select('id, status', { count: 'exact' }).neq('status', 'Inativo'),
           supabase.from('escolas').select('*', { count: 'exact', head: true }),
         ])
         let lotacoesResult = await supabase
@@ -334,8 +334,10 @@ export function useDashboardStats() {
         if (!ativa) return
 
         const requestErrors = [servidoresResult.error, escolasResult.error, lotacoesResult.error].filter(Boolean)
+        const servidoresConsiderados = new Set((servidoresResult.data ?? []).map(servidor => servidor.id))
         const byServ = {}
         ;(lotacoesResult.data ?? []).forEach(lotacao => {
+          if (!servidoresConsiderados.has(lotacao.servidor_id)) return
           if (!byServ[lotacao.servidor_id]) byServ[lotacao.servidor_id] = new Set()
           byServ[lotacao.servidor_id].add(lotacao.escola_id)
         })

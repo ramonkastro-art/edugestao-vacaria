@@ -156,7 +156,7 @@ export default function ServidorModal({
         </div>
 
         {/* Header */}
-        <div className="relative bg-slate-950 px-6 py-5 shrink-0">
+        <div className="relative brand-hero px-6 py-5 shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-lg font-semibold text-white shrink-0">
@@ -409,7 +409,7 @@ export default function ServidorModal({
           <div className="px-5 py-4 border-t border-slate-100 shrink-0">
             <button
               onClick={() => { onClose(); onEdit(servidor) }}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 active:scale-95 transition-all"
+              className="w-full flex items-center justify-center gap-2 py-3 brand-primary text-white rounded-2xl text-sm font-medium active:scale-95 transition-all"
             >
               <Edit2 size={14} /> Editar cadastro
             </button>
