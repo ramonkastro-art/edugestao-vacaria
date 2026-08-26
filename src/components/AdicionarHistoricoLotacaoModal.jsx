@@ -66,7 +66,7 @@ export default function AdicionarHistoricoLotacaoModal({ servidor, escolas = [],
 
   return (
     <div className="fixed inset-0 z-[75] flex items-end md:items-center justify-center bg-slate-950/30 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <div className="bg-white w-full md:max-w-md max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={event => event.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="adicionar-historico-modal-title" className="bg-white w-full md:max-w-md max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={event => event.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1 md:hidden"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
 
         <div className="flex items-start gap-3 px-5 py-4 border-b border-slate-100">
@@ -74,7 +74,7 @@ export default function AdicionarHistoricoLotacaoModal({ servidor, escolas = [],
             <History size={18} className="text-violet-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-base font-semibold text-slate-900">Adicionar ao histórico</p>
+            <p id="adicionar-historico-modal-title" className="text-base font-semibold text-slate-900">Adicionar ao histórico</p>
             <p className="text-xs text-slate-500 mt-0.5 truncate">{servidor.nome}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-100 transition-colors" aria-label="Fechar">

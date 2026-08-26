@@ -20,11 +20,13 @@ function categoriaFuncao(funcao = '') {
 
 function nomeEscolas(servidor) {
   const lotacoes = Array.isArray(servidor?.lotacoes) ? servidor.lotacoes : []
-  return [...new Set(lotacoes.map(lotacao => String(lotacao?.escola?.name ?? '').trim()).filter(Boolean))]
+  return [...new Set(lotacoes.filter(lotacao => !lotacao?.data_fim).map(lotacao => String(lotacao?.escola?.name ?? '').trim()).filter(Boolean))]
 }
 
 function csvCell(valor = '') {
-  return `"${String(valor ?? '').replace(/"/g, '""')}"`
+  const texto = String(valor ?? '')
+  const seguro = /^[=+\-@]/.test(texto) ? `'${texto}` : texto
+  return `"${seguro.replace(/"/g, '""')}"`
 }
 
 function escapeHtml(valor = '') {
@@ -45,8 +47,10 @@ function baixarArquivo(conteudo, nome, tipo = 'text/csv;charset=utf-8;') {
   const link = document.createElement('a')
   link.href = url
   link.download = nome
+  document.body.appendChild(link)
   link.click()
-  URL.revokeObjectURL(url)
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 const MODELOS = [
@@ -124,7 +128,7 @@ export default function Relatorios({ onEditSolicitacao }) {
       const nome = normalizar(servidor.nome)
       const funcaoNormalizada = normalizar(servidor.funcao)
       const formacaoNormalizada = normalizar(servidor.formacao)
-      const escolasServidor = Array.isArray(servidor.lotacoes) ? servidor.lotacoes : []
+      const escolasServidor = (Array.isArray(servidor.lotacoes) ? servidor.lotacoes : []).filter(lotacao => !lotacao?.data_fim)
       const nomeEscolaServidor = nomeEscolas(servidor).map(normalizar).join(' ')
       const buscaOk = !termo || nome.includes(termo) || funcaoNormalizada.includes(termo) || formacaoNormalizada.includes(termo) || nomeEscolaServidor.includes(termo)
       const grupoOk = !grupo || categoriaFuncao(servidor.funcao) === grupo

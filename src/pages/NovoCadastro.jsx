@@ -4,8 +4,7 @@ import {
   School, Hash, ChevronDown, CheckCircle2, Loader2,
   AlertCircle, ArrowLeft, UserPlus, FileText,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
-import { useEscolas } from "../hooks/useData";
+import { criarServidor, useEscolas } from "../hooks/useData";
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────────
 
@@ -157,56 +156,25 @@ export default function NovoCadastro({ onVoltar, onSucesso }) {
     setErro("");
 
     try {
-      const nomeNorm = form.nome
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        .toUpperCase().trim();
+      const { data: servidor, error: cadastroError } = await criarServidor(
+        {
+          nome: form.nome,
+          email: form.email,
+          telefone: form.telefone,
+          endereco: form.endereco,
+          data_nascimento: form.data_nascimento,
+          funcao: form.funcao,
+          tipo_vinculo: form.vinculo,
+          matricula: form.matricula,
+          observacoes: form.cargo_especifico,
+        },
+        form.escola_id ? [form.escola_id] : [],
+      )
 
-      const escolaSel = escolas.find(e => e.id === parseInt(form.escola_id));
+      if (cadastroError) throw new Error(cadastroError.message)
 
-      // 1. Salva na tabela cadastral (todos os servidores)
-      const { data: cad, error: cadErr } = await supabase
-        .from("servidores_unificado")
-        .insert({
-          nome:            form.nome.trim(),
-          nome_normalizado: nomeNorm,
-          email:           form.email || null,
-          telefone:        form.telefone || null,
-          endereco:        form.endereco || null,
-          data_nascimento: form.data_nascimento || null,
-          escola_raw:      escolaSel?.name || null,
-        })
-        .select()
-        .single();
-
-      if (cadErr) throw new Error(cadErr.message);
-
-      // 2. Se docente, cria também em professores + nomeacoes
-      if (isProf && form.escola_id) {
-        const { data: prof, error: profErr } = await supabase
-          .from("professores")
-          .insert({
-            nome:     form.nome.trim(),
-            status:   "Ativo",
-            email:    form.email    || null,
-            telefone: form.telefone || null,
-          })
-          .select()
-          .single();
-
-        if (!profErr && prof) {
-          await supabase.from("nomeacoes").insert({
-            professor_id: prof.id,
-            escola_id:    parseInt(form.escola_id),
-            matricula:    form.matricula || null,
-            cargo:        form.cargo_especifico || form.funcao,
-            tipo_vinculo: form.vinculo || "Efetivo",
-            ativa:        true,
-          });
-        }
-      }
-
-      setSucesso(true);
-      if (onSucesso) onSucesso(cad);
+      setSucesso(true)
+      if (onSucesso) onSucesso(servidor);
     } catch (e) {
       setErro(e.message || "Erro ao salvar. Tente novamente.");
     } finally {

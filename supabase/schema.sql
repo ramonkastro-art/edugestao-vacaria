@@ -1,5 +1,8 @@
 -- ─── TABELAS PRINCIPAIS ───────────────────────────────────────────────────────
 
+-- LEGADO: o aplicativo atual usa supabase/schema_v2.sql.
+-- Não execute este arquivo em uma instalação nova; ele usa professores/nomeacoes.
+
 create table if not exists escolas (
   id          serial primary key,
   name        text not null,

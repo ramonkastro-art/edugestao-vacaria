@@ -3,13 +3,13 @@
 -- Esta migração não altera servidores, escolas, lotações ou efetividade.
 
 -- 1) Cria perfil somente para usuários autenticados que ainda não possuem um.
--- O padrão é secretaria para reproduzir o comportamento do gatilho atual
--- e permitir que os usuários administrativos antigos voltem a editar.
+-- O padrão é viewer por segurança; promova manualmente apenas quem deve
+-- administrar o sistema.
 INSERT INTO public.user_profiles (id, nome, role)
 SELECT
   u.id,
   COALESCE(NULLIF(u.raw_user_meta_data->>'nome', ''), split_part(u.email, '@', 1)),
-  'secretaria'
+  'viewer'
 FROM auth.users u
 LEFT JOIN public.user_profiles up ON up.id = u.id
 WHERE up.id IS NULL;

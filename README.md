@@ -1,99 +1,85 @@
-# EduGestão · Vacaria–RS
+# EduGestão Vacaria
 
-Sistema de gestão do Quadro de Efetividade da Rede Municipal de Ensino de Vacaria–RS.
+Sistema de gestão do quadro de efetividade da Rede Municipal de Ensino de Vacaria–RS. O aplicativo utiliza o Supabase como fonte oficial dos dados de escolas, servidores, lotações, efetividade e solicitações de transferência.
 
 ## Tecnologias
 
-- **React 18** + **Vite**
-- **Tailwind CSS** (design limpo, estilo Apple/Notion)
-- **Lucide React** (ícones)
+- **React 18** com **Vite 5**;
+- **Tailwind CSS 3** e **Lucide React**;
+- **Supabase JS** para autenticação, consultas, RLS e funções transacionais;
+- **PWA** com service worker limitado ao shell estático.
 
-## Como rodar localmente
+## Configuração local
+
+Copie `.env.example` para `.env.local` e preencha somente as variáveis públicas do cliente Supabase:
 
 ```bash
-# 1. Instalar dependências
-npm install
-
-# 2. Iniciar servidor de desenvolvimento
+cp .env.example .env.local
+npm ci
 npm run dev
 ```
 
-Abra [http://localhost:5173](http://localhost:5173) no navegador.
+Abra [http://localhost:5173](http://localhost:5173). A chave `VITE_SUPABASE_ANON_KEY` é uma chave pública do cliente; nunca coloque no frontend uma `service_role` ou qualquer segredo administrativo.
 
-## Build para produção
+## Validação e build
+
+Use os mesmos comandos antes de publicar:
 
 ```bash
+npm ci
 npm run build
+npm run audit:prod
 ```
 
-Os arquivos ficam em `/dist` — prontos para publicar no GitHub Pages, Vercel ou Netlify.
+O build produz `dist/`, que pode ser publicado na Vercel. O projeto declara Node `>=18.18.0`; recomenda-se usar a mesma faixa no desenvolvimento e na plataforma de deploy.
 
-## Deploy no GitHub Pages (opcional)
+## Modelo de dados e migrações
 
-```bash
-npm install --save-dev gh-pages
-```
+O modelo ativo é o de `supabase/schema_v2.sql`, com um cadastro único em `servidores` e vínculos na tabela `lotacoes`. O arquivo `supabase/schema.sql` é **legado** e não deve ser usado para uma instalação nova, pois pertence ao modelo antigo de `professores` e `nomeacoes`.
 
-No `package.json`, adicione em `scripts`:
-```json
-"deploy": "gh-pages -d dist"
-```
+Em um banco novo, execute o `schema_v2.sql` e depois as migrações necessárias. Em um banco existente, faça backup no Supabase e execute as migrações em ordem, sem executar seeds de produção:
 
-E em `vite.config.js`, adicione o `base`:
-```js
-base: '/nome-do-repositorio/',
-```
+| Ordem | Arquivo | Finalidade |
+| --- | --- | --- |
+| 1 | `migration_cpf_servidores.sql` | Adiciona o CPF sem apagar servidores. |
+| 2 | `migration_historico_lotacoes.sql` | Adiciona períodos, índices e RPCs não destrutivas para o histórico. |
+| 3 | `migration_editar_historico_lotacao.sql` | Permite corrigir períodos históricos com validação. |
+| 4 | `migration_proteger_historico.sql` | Impede exclusões em cascata de servidores e escolas com histórico. |
+| 5 | `migration_solicitacoes_transferencia.sql` | Cria solicitações administrativas e valida suas datas. |
+| 6 | `migration_security_hardening.sql` | Corrige a política recursiva de `user_profiles`. |
+| 7 | `migration_admin_policies.sql` | Opcional: completa permissões somente se as tabelas legadas existirem. |
 
-Então:
-```bash
-npm run build && npm run deploy
-```
+Não execute `migration_admin_policies.sql` em uma instalação v2 que não tenha as tabelas `professores` e `nomeacoes`. A migração `migration_historico_manual.sql` só é necessária quando o banco recebeu anteriormente uma versão antiga de `migration_historico_lotacoes.sql` que ainda não possuía a função de inclusão manual.
 
-## Dados
+Uma lotação sem `data_fim` é atual. Uma lotação encerrada permanece no banco com `data_fim` e `motivo_saida`; ela não deve ser excluída para alterar a escola atual. Os RPCs de sincronização e transferência encerram o vínculo anterior e criam o novo registro dentro da mesma operação.
 
-Os dados reais estão em `src/data/data.json` — 614 professores e 30 escolas da rede municipal.
+## Segurança e dados pessoais
+
+As tabelas de negócio usam RLS. A autorização de edição depende de uma linha correspondente em `user_profiles`, com role `secretaria` ou `rh`. A função `public.is_admin()` é `SECURITY DEFINER`, possui `search_path` fixado e substitui a política recursiva anterior do próprio perfil.
+
+O JSON legado com nomes e lotações foi removido de `src/` porque não era importado pela aplicação e continha dados pessoais. Os dados de produção devem permanecer no Supabase. Os arquivos `seed.sql` e `seed_v2.sql` são apenas referências de inicialização; revise e redija os dados antes de armazená-los em repositório público ou executar em produção.
 
 ## Funcionalidades
 
-- **Dashboard** — métricas consolidadas (professores, escolas, duplas nomeações)
-- **Unidades** — grid das 30 escolas com filtro por modalidade
-- **Quadro por Escola** — lista de professores com badges de dupla nomeação
-- **Perfil do Professor** — modal com nomeações, carga horária e EFE
-- **Módulo EFE** — marcar OK ou ocorrência para cada servidor
-- **Busca Global** (⌘K) — por professor ou escola
-
-## Regra de negócio crítica
-
-Professores com 2 nomeações (mesma ou escolas diferentes) possuem **um único cadastro** — a duplicidade está nos vínculos, não na pessoa.
-
-
-## Histórico de lotações e transferência
-
-O sistema mantém um único cadastro por servidor e agora registra a trajetória escolar na própria tabela `lotacoes`. Uma lotação ativa possui `data_fim` nula; quando o vínculo é encerrado ou transferido, ele permanece no banco com `data_fim` e `motivo_saida`, enquanto a nova escola é registrada como uma nova lotação ativa. O botão **Transferir** fica disponível no detalhe do servidor para usuários com permissão de Secretaria ou RH e abre um fluxo com escola de origem, destino, data e motivo opcional.
-
-Para atualizar um banco existente, faça primeiro o backup habitual do projeto no Supabase e execute o arquivo `supabase/migration_historico_lotacoes.sql` no SQL Editor. A migração adiciona colunas, índices e funções transacionais sem apagar lotações existentes. O arquivo `supabase/schema_v2.sql` também foi atualizado para que instalações novas já nasçam com o modelo histórico.
-
-| Operação | Resultado no histórico |
-| --- | --- |
-| Transferir para outra escola | Encerra o vínculo atual e cria o novo vínculo com a data informada. |
-| Remover uma escola no cadastro | Encerra a lotação preservando o registro anterior. |
-| Adicionar outra escola | Cria uma nova lotação ativa sem duplicar o cadastro do servidor. |
-| Consultar o perfil | A aba **Histórico** mostra vínculos atuais e encerrados do mais recente ao mais antigo. |
+- **Dashboard** com escolas, servidores e duplas de lotação ativa;
+- **Unidades** com filtro por modalidade e quadro atual;
+- **Servidores** com busca, filtro de escola e status;
+- **Perfil do servidor** com dados, vínculos atuais e histórico de escolas;
+- **Edição cadastral** sem reabrir vínculos encerrados;
+- **Transferência** e inclusão manual de passagem histórica;
+- **Efetividade mensal** somente para lotações atuais;
+- **Solicitações de transferência** com filtros e exportação;
+- **Busca global** por servidor ou unidade;
+- **PWA** instalável, sem cachear sessões ou respostas do Supabase.
 
 ## Progressive Web App
 
-A aplicação inclui `public/manifest.webmanifest`, service worker e ícones PNG em 192 e 512 pixels. Em produção, o navegador poderá oferecer a instalação como aplicativo na tela inicial; o cache offline fica limitado ao shell estático da aplicação e não armazena respostas, sessões ou dados do Supabase. As consultas e o login continuam dependendo da conectividade com o backend.
+O service worker usa o cache versionado `edugestao-vacaria-shell-v3`. Navegações e `index.html` usam rede primeiro; apenas assets estáticos são armazenados localmente. Respostas do Supabase, sessões e APIs externas nunca são cacheadas.
 
-Depois de publicar uma nova versão, o service worker atualiza o shell automaticamente. Em ambientes com subcaminho, como GitHub Pages, ajuste `base` no `vite.config.js`, `start_url` e `scope` no manifesto para o caminho do repositório antes do deploy.
+Se uma versão antiga continuar visível após um deploy, faça um hard refresh ou remova os dados do site no navegador. A aplicação registra o service worker com `updateViaCache: 'none'` e verifica atualização na inicialização.
 
+## Diagnóstico rápido
 
-## Edição cadastral e inclusão manual no histórico
+Se a aba **Histórico** aparecer vazia, execute `supabase/diagnostico_historico.sql` no SQL Editor. Se houver linhas em `lotacoes`, publique a versão atual do frontend; se não houver linhas, não execute correções destrutivas antes de verificar backup, logs e histórico do projeto no Supabase.
 
-Usuários com perfil de Secretaria ou RH encontram o botão **Editar** diretamente em cada linha da tela de Servidores. A mesma ação continua disponível no detalhe, no cabeçalho, na aba Dados e no rodapé do modal. A edição altera somente os dados cadastrais informados e mantém o cadastro único do servidor.
-
-Na aba **Histórico**, o botão **Adicionar escola** registra uma passagem anterior informando escola, início, fim e motivo opcional. O vínculo é criado já encerrado, não altera a escola atual e não permite períodos sobrepostos ou duplicados. Se `migration_historico_lotacoes.sql` já tiver sido executada anteriormente, execute também `supabase/migration_historico_manual.sql`; se ainda não tiver, a função também está presente na migração principal atualizada.
-
-
-## Diagnóstico de listagem e publicação
-
-Se a busca superior encontrar servidores, mas as telas **Servidores** e **Quadro por Escola** ficarem vazias, a causa mais provável é a migração de histórico ainda não executada. A versão atual tenta o schema compatível e mostra o erro quando a falha é de permissão. Execute `supabase/migration_historico_lotacoes.sql` e `supabase/migration_historico_manual.sql` no Supabase, confirme que o usuário tem uma linha em `user_profiles` com role `secretaria` ou `rh` para editar e publique novamente. Após o deploy, faça hard refresh ou limpe o cache do site para carregar o service worker `shell-v2`.
+Se listas ou métricas não carregarem, observe o banner de erro na própria tela e confirme RLS, existência de `user_profiles` e execução das migrações. A aplicação possui fallback somente para schemas antigos de leitura; operações de escrita dependem das migrações atuais.

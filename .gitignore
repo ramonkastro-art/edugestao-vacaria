@@ -4,3 +4,6 @@ dist
 *.local
 .env
 .env.local
+
+# Seeds podem conter dados locais/produção; mantenha-os fora de novos commits.
+supabase/seed*.sql

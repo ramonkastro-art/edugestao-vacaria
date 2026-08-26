@@ -41,6 +41,7 @@ BEGIN
     SELECT 1
     FROM public.lotacoes l
     WHERE l.servidor_id = p_servidor_id
+      AND l.escola_id = p_escola_id
       AND daterange(l.data_inicio, COALESCE(l.data_fim + 1, 'infinity'::date), '[)')
           && daterange(p_data_inicio, p_data_fim + 1, '[)')
   ) THEN

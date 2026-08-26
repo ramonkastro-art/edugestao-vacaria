@@ -4,7 +4,7 @@ import {
   School, Hash, Save, Loader2, AlertCircle, CheckCircle2,
   ArrowLeft, Trash2, X, GraduationCap,
 } from 'lucide-react'
-import { atualizarServidor, atualizarLotacoes, excluirServidor, criarServidor } from '../hooks/useData'
+import { atualizarServidor, atualizarLotacoes, inativarServidor, criarServidor } from '../hooks/useData'
 
 const FUNCOES = [
   { g: 'Docentes',              v: 'Professor(a) Ed. Básica I' },
@@ -67,15 +67,15 @@ function SelectInput({ icon: Icon, disabled, children, ...props }) {
 }
 function ConfirmModal({ nome, onConfirm, onCancel }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-labelledby="confirmar-inativacao-title" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
             <Trash2 size={18} className="text-red-600" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-800">Confirmar exclusão</p>
-            <p className="text-xs text-slate-500 mt-0.5">Excluir <strong>{nome}</strong>? Não pode ser desfeito.</p>
+            <p id="confirmar-inativacao-title" className="text-sm font-semibold text-slate-800">Inativar cadastro</p>
+            <p className="text-xs text-slate-500 mt-0.5">Inativar <strong>{nome}</strong>? O histórico será preservado.</p>
           </div>
         </div>
         <div className="flex gap-3">
@@ -85,7 +85,7 @@ function ConfirmModal({ nome, onConfirm, onCancel }) {
           </button>
           <button onClick={onConfirm}
             className="flex-1 py-2.5 bg-red-600 text-white rounded-2xl text-sm font-medium hover:bg-red-700">
-            Excluir
+            Inativar
           </button>
         </div>
       </div>
@@ -111,7 +111,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
 
   // Escolas vinculadas (ids como strings)
   const [escolasSel, setEscolasSel] = useState(
-    (servidor?.lotacoes ?? []).map(l => String(l.escola_id))
+    (servidor?.lotacoes ?? []).filter(l => !l.data_fim).map(l => String(l.escola_id))
   )
 
   const [saving, setSaving]   = useState(false)
@@ -172,9 +172,9 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
 
   async function handleDelete() {
     setConfirmDel(false)
-    const { error } = await excluirServidor(servidor.id)
+    const { error } = await inativarServidor(servidor.id)
     if (!error) { onDeleted?.(); onClose?.() }
-    else setErro('Erro ao excluir: ' + error.message)
+    else setErro('Erro ao inativar: ' + error.message)
   }
 
   const escolasDisponiveis = escolas.filter(e => !escolasSel.includes(String(e.id)))
@@ -383,7 +383,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
         {/* Rodapé */}
         <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
           {!isNovo && (
-            <button onClick={() => setConfirmDel(true)}
+            <button type="button" onClick={() => setConfirmDel(true)} aria-label="Inativar servidor" title="Inativar servidor"
               className="flex items-center gap-1.5 px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
               <Trash2 size={14} />
             </button>

@@ -6,6 +6,7 @@ const STATUS = ['Pendente', 'Aprovado', 'Atendido', 'Cancelado']
 
 export default function SolicitacaoTransferenciaModal({ servidor, escolas = [], solicitacao = null, onClose, onSuccess }) {
   const lotacoesAtuais = (servidor?.lotacoes ?? []).filter(lotacao => !lotacao.data_fim)
+  const escolasAtuaisIds = new Set(lotacoesAtuais.map(lotacao => String(lotacao.escola_id)))
   const escolaPrincipal = lotacoesAtuais.find(lotacao => lotacao.principal) ?? lotacoesAtuais[0]
   const [escolaOrigemId, setEscolaOrigemId] = useState(String(solicitacao?.escola_origem_id ?? escolaPrincipal?.escola_id ?? ''))
   const [escolaDestinoId, setEscolaDestinoId] = useState(String(solicitacao?.escola_destino_id ?? ''))
@@ -24,6 +25,10 @@ export default function SolicitacaoTransferenciaModal({ servidor, escolas = [], 
     }
     if (escolaOrigemId && escolaOrigemId === escolaDestinoId) {
       setErro('A escola de destino deve ser diferente da escola de origem.')
+      return
+    }
+    if (escolasAtuaisIds.has(escolaDestinoId) && String(solicitacao?.escola_destino_id ?? '') !== escolaDestinoId) {
+      setErro('O servidor já possui uma lotação ativa nessa escola.')
       return
     }
     if (dataPedido > hojeISO()) {
@@ -67,18 +72,18 @@ export default function SolicitacaoTransferenciaModal({ servidor, escolas = [], 
 
   return (
     <div className="fixed inset-0 z-[82] flex items-end md:items-center justify-center bg-slate-950/30 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <div className="bg-white w-full md:max-w-md max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={event => event.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="solicitacao-transferencia-modal-title" className="bg-white w-full md:max-w-md max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={event => event.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1 md:hidden"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
         <div className="flex items-start gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
           <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0"><ArrowRightLeft size={18} className="text-blue-600" /></div>
-          <div className="flex-1 min-w-0"><p className="text-base font-semibold text-slate-900">{solicitacao ? 'Editar pedido de transferência' : 'Novo pedido de transferência'}</p><p className="text-xs text-slate-500 mt-0.5 truncate">{servidor?.nome || 'Servidor'}</p></div>
+          <div className="flex-1 min-w-0"><p id="solicitacao-transferencia-modal-title" className="text-base font-semibold text-slate-900">{solicitacao ? 'Editar pedido de transferência' : 'Novo pedido de transferência'}</p><p className="text-xs text-slate-500 mt-0.5 truncate">{servidor?.nome || 'Servidor'}</p></div>
           <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-100" aria-label="Fechar"><X size={17} className="text-slate-400" /></button>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-4">
           <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl"><p className="text-xs leading-relaxed text-blue-800">Este pedido é apenas administrativo. Salvar o pedido não transfere o servidor automaticamente; a mudança deve ser feita depois pela ação de transferência.</p></div>
           <label className="block"><span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Escola de origem <span className="normal-case font-normal text-slate-400">(opcional)</span></span><div className="flex items-center gap-2 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl"><School size={15} className="text-slate-400 shrink-0" /><select value={escolaOrigemId} onChange={event => setEscolaOrigemId(event.target.value)} className="flex-1 bg-transparent text-sm outline-none text-slate-800"><option value="">Não informado</option>{lotacoesAtuais.map(lotacao => <option key={lotacao.escola_id} value={lotacao.escola_id}>{lotacao.escola?.name || 'Escola não encontrada'}</option>)}</select></div></label>
-          <label className="block"><span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Escola para transferência</span><div className="flex items-center gap-2 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl"><School size={15} className="text-slate-400 shrink-0" /><select value={escolaDestinoId} onChange={event => setEscolaDestinoId(event.target.value)} className="flex-1 bg-transparent text-sm outline-none text-slate-800"><option value="">Selecionar escola...</option>{escolas.map(escola => <option key={escola.id} value={escola.id}>{escola.name}</option>)}</select></div></label>
+          <label className="block"><span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Escola para transferência</span><div className="flex items-center gap-2 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl"><School size={15} className="text-slate-400 shrink-0" /><select value={escolaDestinoId} onChange={event => setEscolaDestinoId(event.target.value)} className="flex-1 bg-transparent text-sm outline-none text-slate-800"><option value="">Selecionar escola...</option>{escolas.filter(escola => !escolasAtuaisIds.has(String(escola.id)) || String(solicitacao?.escola_destino_id ?? '') === String(escola.id)).map(escola => <option key={escola.id} value={escola.id}>{escola.name}</option>)}</select></div></label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block"><span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Data do pedido</span><div className="flex items-center gap-2 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl"><Calendar size={15} className="text-slate-400 shrink-0" /><input type="date" value={dataPedido} max={hojeISO()} onChange={event => setDataPedido(event.target.value)} className="flex-1 min-w-0 bg-transparent text-sm outline-none text-slate-800" /></div></label>
             <label className="block"><span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Status</span><select value={status} onChange={event => setStatus(event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none text-slate-800">{STATUS.map(item => <option key={item}>{item}</option>)}</select></label>

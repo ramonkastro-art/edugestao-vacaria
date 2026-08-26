@@ -253,6 +253,7 @@ BEGIN
     SELECT 1
     FROM public.lotacoes l
     WHERE l.servidor_id = p_servidor_id
+      AND l.escola_id = p_escola_id
       AND daterange(l.data_inicio, COALESCE(l.data_fim + 1, 'infinity'::date), '[)')
           && daterange(p_data_inicio, p_data_fim + 1, '[)')
   ) THEN
@@ -288,3 +289,31 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.adicionar_historico_lotacao(UUID, INTEGER, DATE, DATE, TEXT) TO authenticated;
+
+
+-- Validações aplicadas também a gravações fora da interface.
+CREATE OR REPLACE FUNCTION public.validar_periodo_lotacao()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.data_inicio IS NULL THEN
+    RAISE EXCEPTION 'A data de início da lotação é obrigatória';
+  END IF;
+  IF NEW.data_inicio > CURRENT_DATE THEN
+    RAISE EXCEPTION 'A data de início da lotação não pode estar no futuro';
+  END IF;
+  IF NEW.data_fim IS NOT NULL AND NEW.data_fim < NEW.data_inicio THEN
+    RAISE EXCEPTION 'O fim da lotação não pode ser anterior ao início';
+  END IF;
+  IF NEW.data_fim IS NOT NULL AND NEW.data_fim > CURRENT_DATE THEN
+    RAISE EXCEPTION 'O fim da lotação não pode estar no futuro';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS lotacoes_validar_periodo ON public.lotacoes;
+CREATE TRIGGER lotacoes_validar_periodo
+  BEFORE INSERT OR UPDATE ON public.lotacoes
+  FOR EACH ROW EXECUTE PROCEDURE public.validar_periodo_lotacao();

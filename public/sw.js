@@ -1,4 +1,4 @@
-const CACHE_NAME = 'edugestao-vacaria-shell-v2'
+const CACHE_NAME = 'edugestao-vacaria-shell-v3'
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -28,19 +28,25 @@ self.addEventListener('activate', event => {
   )
 })
 
+self.addEventListener('message', event => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting()
+})
+
 self.addEventListener('fetch', event => {
-  const requestUrl = new URL(event.request.url)
+  const request = event.request
+  const requestUrl = new URL(request.url)
 
-  // O Supabase continua sendo a fonte de dados online. O SW não deve cachear
-  // respostas de API, sessões ou informações potencialmente desatualizadas.
-  if (requestUrl.origin !== self.location.origin || event.request.method !== 'GET') return
+  // O Supabase e qualquer API externa continuam sempre fora do cache local.
+  if (requestUrl.origin !== self.location.origin || request.method !== 'GET') return
 
-  if (event.request.mode === 'navigate') {
+  if (request.mode === 'navigate' || requestUrl.pathname === '/index.html') {
     event.respondWith(
-      fetch(event.request)
+      fetch(request, { cache: 'no-store' })
         .then(response => {
-          const copy = response.clone()
-          caches.open(CACHE_NAME).then(cache => cache.put('/index.html', copy))
+          if (response.ok) {
+            const copy = response.clone()
+            caches.open(CACHE_NAME).then(cache => cache.put('/index.html', copy))
+          }
           return response
         })
         .catch(() => caches.match('/index.html'))
@@ -48,11 +54,14 @@ self.addEventListener('fetch', event => {
     return
   }
 
+  const isStaticAsset = ['script', 'style', 'image', 'font', 'manifest'].includes(request.destination)
+  if (!isStaticAsset) return
+
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+    caches.match(request).then(cached => cached || fetch(request).then(response => {
       if (response.ok) {
         const copy = response.clone()
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy))
+        caches.open(CACHE_NAME).then(cache => cache.put(request, copy))
       }
       return response
     }))

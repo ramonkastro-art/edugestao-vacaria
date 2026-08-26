@@ -38,6 +38,7 @@ export default function ServidorModal({
   const [tab, setTab] = useState('escola') // 'escola' | 'dados' | 'historico'
   const [cadastro, setCadastro] = useState(null)
   const [loadingCadastro, setLoadingCadastro] = useState(false)
+  const [cadastroErro, setCadastroErro] = useState('')
   const [historico, setHistorico] = useState(null)
   const [loadingHistorico, setLoadingHistorico] = useState(false)
   const [historicoErro, setHistoricoErro] = useState('')
@@ -53,6 +54,14 @@ export default function ServidorModal({
   const lotacoesExibidas = historico ?? lotacoes
   const lotacoesAtuais = lotacoesExibidas.filter(lotacao => !lotacao.data_fim)
   const escolas = lotacoesAtuais.map(l => l.escola).filter(Boolean)
+
+  useEffect(() => {
+    setTab('escola')
+    setCadastro(null)
+    setCadastroErro('')
+    setHistorico(null)
+    setHistoricoErro('')
+  }, [servidorId])
 
   useEffect(() => {
     if (tab !== 'historico' || !servidorId) {
@@ -80,23 +89,50 @@ export default function ServidorModal({
         }
         setLoadingHistorico(false)
       })
+      .catch(error => {
+        if (cancelada) return
+        setHistoricoErro(error?.message || 'Não foi possível carregar o histórico.')
+        setHistorico(null)
+        setLoadingHistorico(false)
+      })
 
     return () => { cancelada = true }
   }, [tab, servidorId])
 
-  if (!servidor) return null
-
-  // Quando abre aba dados, garante que temos todos os campos
   useEffect(() => {
-    if (tab !== 'dados' || cadastro) return
+    function fecharComEscape(event) {
+      if (event.key === 'Escape') onClose?.()
+    }
+    window.addEventListener('keydown', fecharComEscape)
+    return () => window.removeEventListener('keydown', fecharComEscape)
+  }, [onClose])
+
+  // Quando abre a aba Dados, garante que temos todos os campos.
+  useEffect(() => {
+    if (tab !== 'dados' || cadastro || !servidorId) return
+    let cancelada = false
     setLoadingCadastro(true)
+    setCadastroErro('')
     supabase
       .from('servidores')
       .select('*')
-      .eq('id', servidor.id)
+      .eq('id', servidorId)
       .single()
-      .then(({ data }) => { setCadastro(data); setLoadingCadastro(false) })
-  }, [tab, servidor.id, cadastro])
+      .then(({ data, error }) => {
+        if (cancelada) return
+        if (error) setCadastroErro(error.message || 'Não foi possível carregar os dados cadastrais.')
+        else setCadastro(data)
+        setLoadingCadastro(false)
+      })
+      .catch(error => {
+        if (cancelada) return
+        setCadastroErro(error?.message || 'Não foi possível carregar os dados cadastrais.')
+        setLoadingCadastro(false)
+      })
+    return () => { cancelada = true }
+  }, [tab, servidorId, cadastro])
+
+  if (!servidor) return null
 
   const dadosBase = cadastro ?? servidor
 
@@ -106,6 +142,9 @@ export default function ServidorModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="servidor-modal-title"
         className="bg-white w-full md:max-w-md md:mx-4 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
@@ -122,7 +161,7 @@ export default function ServidorModal({
                 {initials(servidor.nome)}
               </div>
               <div>
-                <h2 className="text-base font-semibold text-white leading-snug">{servidor.nome}</h2>
+                <h2 id="servidor-modal-title" className="text-base font-semibold text-white leading-snug">{servidor.nome}</h2>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                     servidor.status === 'Ativo' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
@@ -221,6 +260,7 @@ export default function ServidorModal({
               </div>
             ) : (
               <div className="space-y-2">
+                {cadastroErro && <div className="p-3 mb-3 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-800">{cadastroErro}</div>}
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Dados Pessoais</p>
                 {dadosBase.cpf && (
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl">

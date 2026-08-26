@@ -42,3 +42,34 @@ DROP TRIGGER IF EXISTS solicitacoes_transferencia_updated_at ON public.solicitac
 CREATE TRIGGER solicitacoes_transferencia_updated_at
   BEFORE UPDATE ON public.solicitacoes_transferencia
   FOR EACH ROW EXECUTE PROCEDURE public.update_updated_at();
+
+
+-- Validações aplicadas também a gravações fora da interface.
+CREATE OR REPLACE FUNCTION public.validar_solicitacao_transferencia()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.data_pedido > CURRENT_DATE THEN
+    RAISE EXCEPTION 'A data do pedido não pode estar no futuro';
+  END IF;
+  IF NEW.data_atendimento IS NOT NULL AND NEW.data_atendimento < NEW.data_pedido THEN
+    RAISE EXCEPTION 'A data de atendimento não pode ser anterior à data do pedido';
+  END IF;
+  IF NEW.data_atendimento IS NOT NULL AND NEW.data_atendimento > CURRENT_DATE THEN
+    RAISE EXCEPTION 'A data de atendimento não pode estar no futuro';
+  END IF;
+  IF NEW.status = 'Atendido' AND NEW.data_atendimento IS NULL THEN
+    RAISE EXCEPTION 'Pedidos atendidos devem informar a data de atendimento';
+  END IF;
+  IF NEW.status <> 'Atendido' THEN
+    NEW.data_atendimento := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS solicitacoes_transferencia_validar ON public.solicitacoes_transferencia;
+CREATE TRIGGER solicitacoes_transferencia_validar
+  BEFORE INSERT OR UPDATE ON public.solicitacoes_transferencia
+  FOR EACH ROW EXECUTE PROCEDURE public.validar_solicitacao_transferencia();

@@ -56,7 +56,7 @@ export default function TransferirLotacaoModal({ servidor, escolas = [], onClose
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center bg-slate-950/30 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
-      <div className="bg-white w-full md:max-w-md max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={event => event.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="transferencia-modal-title" className="bg-white w-full md:max-w-md max-h-[calc(100dvh-0.5rem)] md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={event => event.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1 md:hidden">
           <div className="w-10 h-1 rounded-full bg-slate-200" />
         </div>
@@ -66,7 +66,7 @@ export default function TransferirLotacaoModal({ servidor, escolas = [], onClose
             <ArrowRightLeft size={18} className="text-blue-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-base font-semibold text-slate-900">Transferir servidor</p>
+            <p id="transferencia-modal-title" className="text-base font-semibold text-slate-900">Transferir servidor</p>
             <p className="text-xs text-slate-500 mt-0.5 truncate">{servidor.nome}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-slate-100 transition-colors" aria-label="Fechar">
@@ -114,7 +114,7 @@ export default function TransferirLotacaoModal({ servidor, escolas = [], onClose
               <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Data da troca</span>
               <div className="flex items-center gap-2 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400">
                 <Calendar size={15} className="text-slate-400 shrink-0" />
-                <input type="date" value={dataTransferencia} onChange={event => setDataTransferencia(event.target.value)} className="flex-1 bg-transparent text-sm outline-none text-slate-800" />
+                <input type="date" value={dataTransferencia} max={hojeISO()} onChange={event => setDataTransferencia(event.target.value)} className="flex-1 bg-transparent text-sm outline-none text-slate-800" />
               </div>
             </label>
             <label className="block">
@@ -130,7 +130,7 @@ export default function TransferirLotacaoModal({ servidor, escolas = [], onClose
 
         <div className="modal-footer-safe px-5 py-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 shrink-0">
           <button onClick={onClose} disabled={saving} className="w-full sm:w-auto px-4 py-3 border border-slate-200 rounded-2xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
-          <button onClick={handleTransferir} disabled={saving || saved || destinos.length === 0} className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 active:scale-[0.98] transition-all">
+          <button onClick={handleTransferir} disabled={saving || saved || !origemId || destinos.length === 0} className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-950 text-white rounded-2xl text-sm font-medium hover:bg-slate-800 disabled:opacity-50 active:scale-[0.98] transition-all">
             {saving ? <><Loader2 size={14} className="animate-spin" /> Registrando…</> : <><ArrowRightLeft size={14} /> Confirmar transferência</>}
           </button>
         </div>

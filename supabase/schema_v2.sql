@@ -50,8 +50,8 @@ CREATE INDEX IF NOT EXISTS idx_servidores_status    ON servidores(status);
 
 CREATE TABLE IF NOT EXISTS lotacoes (
   id           SERIAL PRIMARY KEY,
-  servidor_id  UUID NOT NULL REFERENCES servidores(id) ON DELETE CASCADE,
-  escola_id    INTEGER NOT NULL REFERENCES escolas(id) ON DELETE CASCADE,
+  servidor_id  UUID NOT NULL REFERENCES servidores(id) ON DELETE RESTRICT,
+  escola_id    INTEGER NOT NULL REFERENCES escolas(id) ON DELETE RESTRICT,
   principal    BOOLEAN DEFAULT false,
   data_inicio  DATE NOT NULL DEFAULT CURRENT_DATE,
   data_fim     DATE,
@@ -177,21 +177,37 @@ DROP POLICY IF EXISTS "profiles_self" ON user_profiles;
 CREATE POLICY "profiles_self" ON user_profiles
   FOR SELECT TO authenticated USING (id = auth.uid());
 
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.user_profiles
+    WHERE id = auth.uid()
+      AND role IN ('secretaria', 'rh')
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.is_admin() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+
 DROP POLICY IF EXISTS "profiles_admin" ON user_profiles;
 CREATE POLICY "profiles_admin" ON user_profiles
   FOR ALL TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM user_profiles
-    WHERE id = auth.uid() AND role IN ('secretaria','rh')
-  ));
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 -- ─── 7. TRIGGER: auto-criar perfil ao registrar usuário ──────────────────────
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   INSERT INTO public.user_profiles (id, nome, role)
-  VALUES (NEW.id, NEW.raw_user_meta_data->>'nome', 'secretaria')
+  VALUES (NEW.id, NEW.raw_user_meta_data->>'nome', 'viewer')
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
@@ -223,3 +239,33 @@ CREATE TRIGGER efe_updated_at
 SELECT table_name FROM information_schema.tables
 WHERE table_schema = 'public'
 ORDER BY table_name;
+
+
+-- ─── 9. VALIDAÇÕES DE INTEGRIDADE ─────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.validar_periodo_lotacao()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.data_inicio IS NULL THEN
+    RAISE EXCEPTION 'A data de início da lotação é obrigatória';
+  END IF;
+  IF NEW.data_inicio > CURRENT_DATE THEN
+    RAISE EXCEPTION 'A data de início da lotação não pode estar no futuro';
+  END IF;
+  IF NEW.data_fim IS NOT NULL AND NEW.data_fim < NEW.data_inicio THEN
+    RAISE EXCEPTION 'O fim da lotação não pode ser anterior ao início';
+  END IF;
+  IF NEW.data_fim IS NOT NULL AND NEW.data_fim > CURRENT_DATE THEN
+    RAISE EXCEPTION 'O fim da lotação não pode estar no futuro';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS lotacoes_validar_periodo ON public.lotacoes;
+CREATE TRIGGER lotacoes_validar_periodo
+  BEFORE INSERT OR UPDATE ON public.lotacoes
+  FOR EACH ROW EXECUTE PROCEDURE public.validar_periodo_lotacao();
+

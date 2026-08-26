@@ -5,7 +5,6 @@ import {
   GraduationCap, Briefcase, Loader2, RefreshCw, Shield,
   UserPlus, Edit2, Filter, ArrowRightLeft,
 } from 'lucide-react'
-import { supabase } from './lib/supabase'
 import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import EditarServidor from './pages/EditarServidor'
@@ -129,20 +128,23 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenServidor }) {
   },[onClose])
 
   useEffect(()=>{
-    if(query.length<2){setResults({servidores:[],escolas:[]});setSearchError('');return}
+    let cancelada=false
+    if(query.length<2){setResults({servidores:[],escolas:[]});setSearchError('');setSearching(false);return()=>{cancelada=true}}
     setSearching(true)
     const t=setTimeout(async()=>{
       try {
         const r=await buscarGlobal(query)
+        if(cancelada)return
         setResults(r??{servidores:[],escolas:[]})
         setSearchError(r?.error || '')
       } catch (error) {
+        if(cancelada)return
         setResults({servidores:[],escolas:[]})
         setSearchError(error?.message || 'Não foi possível realizar a busca.')
       }
-      finally{setSearching(false)}
+      finally{if(!cancelada)setSearching(false)}
     },300)
-    return()=>clearTimeout(t)
+    return()=>{cancelada=true;clearTimeout(t)}
   },[query])
 
   const total=(results.servidores?.length??0)+(results.escolas?.length??0)
@@ -184,7 +186,7 @@ function SearchOverlay({ onClose, onSelectSchool, onOpenServidor }) {
             <div className="p-2">
               <p className="text-xs font-semibold text-slate-400 px-3 py-2 uppercase tracking-wider">Servidores</p>
               {results.servidores.map(s=>{
-                const escNomes=[...new Set((s.lotacoes??[]).map(l=>l.escola?.name).filter(Boolean))]
+                const escNomes=[...new Set((s.lotacoes??[]).filter(l=>!l.data_fim).map(l=>l.escola?.name).filter(Boolean))]
                 return (
                   <button key={s.id} onClick={()=>{onOpenServidor(s);onClose()}}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 active:bg-slate-100 text-left transition-colors">
@@ -348,7 +350,7 @@ function SchoolQuadro({ escola, onBack, onOpenServidor }) {
         <div className="space-y-2">
           {filtered.length===0&&<div className="text-center py-16 text-slate-400"><Users size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Nenhum servidor encontrado</p></div>}
           {filtered.map(srv=>{
-            const outrasEscolas=(srv.lotacoes??[]).filter(l=>l.escola_id!==escola.id).map(l=>l.escola?.name).filter(Boolean)
+            const outrasEscolas=(srv.lotacoes??[]).filter(l=>!l.data_fim&&l.escola_id!==escola.id).map(l=>l.escola?.name).filter(Boolean)
             const efeS=efe[srv.id]
             return (
               <div key={srv.id} className="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
@@ -439,7 +441,8 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
       {filtered.length===0&&!loading&&<div className="text-center py-16 text-slate-400"><Users size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Nenhum servidor encontrado</p></div>}
       <div className="space-y-2">
         {filtered.map(s=>{
-          const escNomes=[...new Set((s.lotacoes??[]).map(l=>l.escola?.name).filter(Boolean))]
+          const lotacoesAtuais=(s.lotacoes??[]).filter(l=>!l.data_fim)
+          const escNomes=[...new Set(lotacoesAtuais.map(l=>l.escola?.name).filter(Boolean))]
           return (
             <div key={s.id} onClick={()=>onOpenServidor(s)}
               className="flex items-center gap-2.5 sm:gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 active:bg-slate-50 cursor-pointer transition-all">
@@ -447,7 +450,7 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-semibold text-slate-800">{s.nome}</p>
-                  {(s.lotacoes??[]).length>1&&<Badge className="bg-blue-50 text-blue-600 border-blue-200"><Briefcase size={10}/>{s.lotacoes.length}</Badge>}
+                  {lotacoesAtuais.length>1&&<Badge className="bg-blue-50 text-blue-600 border-blue-200"><Briefcase size={10}/>{lotacoesAtuais.length}</Badge>}
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.status==='Ativo'?'bg-emerald-500':s.status==='Afastado'?'bg-amber-400':'bg-slate-300'}`}/>
                 </div>
                 <p className="text-xs text-slate-400 truncate mt-0.5">{escNomes.join(' · ')||'Sem escola vinculada'}</p>
@@ -484,7 +487,7 @@ function EfeModule({ onOpenServidor }) {
     const q=search.toLowerCase()
     return servidores.filter(s=>
       (search===''||s.nome.toLowerCase().includes(q))&&
-      (escolaFiltro===''||(s.lotacoes??[]).some(l=>String(l.escola_id)===escolaFiltro))
+      (escolaFiltro===''||(s.lotacoes??[]).some(l=>!l.data_fim&&String(l.escola_id)===escolaFiltro))
     ).slice(0,100)
   },[servidores,search,escolaFiltro])
   if(loading)return<Spinner/>
