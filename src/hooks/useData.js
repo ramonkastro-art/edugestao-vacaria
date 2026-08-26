@@ -279,3 +279,9 @@ export async function excluirServidor(id) {
   const { error } = await supabase.from('servidores').delete().eq('id', id)
   return { error }
 }
+
+// ─── STUBS — compatibilidade com páginas legadas ─────────────────────────────
+
+export function useSolicitacoesTransferencia() {
+  return { solicitacoes: [], loading: false, reload: () => {} }
+}
