@@ -14,9 +14,9 @@ import TransferirLotacaoModal from './components/TransferirLotacaoModal'
 import AdicionarHistoricoLotacaoModal from './components/AdicionarHistoricoLotacaoModal'
 import EditarHistoricoLotacaoModal from './components/EditarHistoricoLotacaoModal'
 import SolicitacaoTransferenciaModal from './components/SolicitacaoTransferenciaModal'
+import EfetividadeModule from './components/EfetividadeModule'
 import {
-  useEscolas, useServidores, useServidoresByEscola,
-  useEfetividade, useDashboardStats, buscarGlobal,
+  useEscolas, useServidores, useDashboardStats, buscarGlobal,
 } from './hooks/useData'
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -474,72 +474,7 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
   )
 }
 
-// ─── EFE MODULE ──────────────────────────────────────────────────────────────
-
-function EfeModule({ onOpenServidor }) {
-  const {servidores,loading,error:servidoresError,migrationWarning}=useServidores()
-  const {escolas,error:escolasError}=useEscolas()
-  const [escolaFiltro,setEscolaFiltro]=useState('')
-  const [search,setSearch]=useState('')
-  const escolaSel=useMemo(()=>escolas.find(e=>String(e.id)===escolaFiltro),[escolas,escolaFiltro])
-  const {efe,salvarEfe,saving,error:efeError}=useEfetividade(escolaSel?.id,mesAnoAtual())
-  const filtered=useMemo(()=>{
-    const q=search.toLowerCase()
-    return servidores.filter(s=>
-      s.status !== 'Inativo' &&
-      (search===''||s.nome.toLowerCase().includes(q))&&
-      (escolaFiltro===''||(s.lotacoes??[]).some(l=>!l.data_fim&&String(l.escola_id)===escolaFiltro))
-    ).slice(0,100)
-  },[servidores,search,escolaFiltro])
-  if(loading)return<Spinner/>
-  return (
-    <div className="space-y-5">
-      <div><h1 className="text-xl font-semibold text-slate-900">Efetividade — EFE</h1><p className="text-sm text-slate-500 mt-0.5">Registro mensal · {mesAnoLabel(mesAnoAtual())}</p></div>
-      <DataBanner error={servidoresError || escolasError || efeError} migrationWarning={migrationWarning}/>
-      <div className="space-y-2">
-        <select value={escolaFiltro} onChange={e=>setEscolaFiltro(e.target.value)}
-          className="w-full px-3 py-2.5 bg-slate-100 rounded-xl text-sm text-slate-600 outline-none cursor-pointer">
-          <option value="">Selecionar escola...</option>
-          {escolas.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-        </select>
-        {escolaFiltro&&<div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
-          <Search size={15} className="text-slate-400"/>
-          <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-            placeholder="Buscar servidor..." value={search} onChange={e=>setSearch(e.target.value)}/>
-        </div>}
-      </div>
-      {!escolaFiltro&&<div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-700">Selecione uma escola para registrar a efetividade.</div>}
-      {escolaFiltro&&<p className="text-xs text-slate-400">{filtered.length} servidores {saving&&'· salvando…'}</p>}
-      <div className="space-y-2">
-        {filtered.map(s=>{
-          const efeS=efe[s.id]
-          return (
-              <div key={s.id} className="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
-              <AvatarCircle name={s.nome}/>
-              <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>onOpenServidor(s)}>
-                <p className="text-sm font-semibold text-slate-800 truncate">{s.nome}</p>
-                {s.funcao&&<p className="text-xs text-slate-400">{s.funcao}</p>}
-              </div>
-              <div className="w-full sm:w-auto flex items-center justify-end gap-1.5 shrink-0">
-                <button onClick={()=>escolaSel&&salvarEfe(s.id,'ok',null)} disabled={!escolaSel}
-                  className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-40 ${efeS?.status==='ok'?'bg-emerald-500 text-white':'bg-slate-100 text-slate-500'}`}>
-                  <CheckCircle2 size={13}/><span className="hidden sm:inline ml-1">OK</span>
-                </button>
-                <select disabled={!escolaSel}
-                  value={efeS?.status==='ocorrencia'?efeS.ocorrencia:''}
-                  onChange={e=>escolaSel&&salvarEfe(s.id,'ocorrencia',e.target.value)}
-                  className={`px-2 py-2 rounded-xl text-xs font-medium outline-none cursor-pointer disabled:opacity-40 max-w-24 sm:max-w-none ${efeS?.status==='ocorrencia'?'bg-amber-400 text-white':'bg-slate-100 text-slate-500'}`}>
-                  <option value="">Ocorrência</option>
-                  {OCORRENCIAS.map(o=><option key={o}>{o}</option>)}
-                </select>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
+// ─── APP SHELL ───────────────────────────────────────────────────────────────
 
 // ─── APP SHELL ───────────────────────────────────────────────────────────────
 
@@ -711,7 +646,7 @@ export default function App() {
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
           {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={admin} refreshToken={dataVersion}/>}
-          {view==='efe'&&<EfeModule onOpenServidor={setSelectedServidor}/>}
+          {view==='efe'&&<EfetividadeModule onOpenServidor={setSelectedServidor} canEdit={Boolean(admin || profile?.role === 'diretor')} canManage={admin} escolaPermitidaId={profile?.role === 'diretor' ? profile?.escola_id : null}/>}
           {view==='relatorios'&&<Relatorios onEditSolicitacao={admin ? (item => { const servidor = allServidores.find(s => s.id === item.servidor_id) ?? item.servidor; setSolicitacaoTransferenciaEdit({ servidor, solicitacao: item }) }) : null}/>}
         </main>
       </div>

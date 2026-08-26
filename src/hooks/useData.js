@@ -270,7 +270,7 @@ export function useEfetividade(escolaId, mesAno) {
     return () => { ativa = false }
   }, [escolaId, mesAno])
 
-  async function salvarEfe(servidorId, status, ocorrencia = null) {
+  async function salvarEfe(servidorId, status, ocorrencia = null, observacoes = '') {
     if (!escolaId || !mesAno || !servidorId) return { error: new Error('Escola, mês e servidor são obrigatórios.') }
     setSaving(true)
     setError('')
@@ -282,6 +282,7 @@ export function useEfetividade(escolaId, mesAno) {
         mes_ano: mesAno,
         status,
         ocorrencia,
+        observacoes: String(observacoes ?? '').trim() || null,
         registrado_por: authData?.user?.email,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'servidor_id,escola_id,mes_ano' }).select().single()
@@ -291,7 +292,7 @@ export function useEfetividade(escolaId, mesAno) {
         return { error: requestError }
       }
 
-      setEfe(prev => ({ ...prev, [servidorId]: data ?? { servidor_id: servidorId, status, ocorrencia } }))
+      setEfe(prev => ({ ...prev, [servidorId]: data ?? { servidor_id: servidorId, status, ocorrencia, observacoes } }))
       return { data, error: null }
     } catch (requestError) {
       const normalizedError = comoErro(requestError, 'Não foi possível salvar a efetividade.')

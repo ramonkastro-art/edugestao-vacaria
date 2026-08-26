@@ -82,10 +82,16 @@ A aplicação usa a identidade nos cartões da **Visão Geral**, nos estados ati
 - **Edição cadastral** sem alterar vínculos de outras escolas;
 - **Edição individual de lotações** atuais e históricas, com correção de início, fim e motivo;
 - **Transferência** e inclusão manual de passagem histórica;
-- **Efetividade mensal** somente para lotações atuais;
+- **Efetividade mensal** por unidade e servidor, com marcação Tudo OK, registro de atestado ou outra ocorrência e observação opcional;
 - **Solicitações de transferência** com filtros e exportação;
 - **Busca global** por servidor ou unidade;
 - **PWA** instalável, sem cachear sessões ou respostas do Supabase.
+
+## Efetividade mensal
+
+A aba **Efetividade** foi desenhada como uma conferência mensal da unidade, e não como um relógio de ponto eletrônico. A diretora ou gestora seleciona a escola e a competência, localiza cada servidor e escolhe **Tudo OK** quando não há ocorrência ou registra **Atestado**, **Falta**, **Licença**, **Abono** ou **Outro** quando necessário. A observação pode receber o período, protocolo ou uma breve referência para facilitar a conferência pela Secretaria/RH.
+
+O status fica associado ao servidor, à escola e ao mês. Ele pode ser corrigido durante a competência, e os filtros permitem localizar rapidamente registros pendentes, conferidos ou com ocorrência. Perfis administrativos continuam com visão de todas as escolas; o perfil de diretora deve ficar vinculado à sua unidade por meio de `user_profiles.escola_id`. O módulo não substitui o controle formal exigido pelas normas municipais ou pelo estatuto local; antes de uso oficial, a Secretaria/RH deve confirmar os tipos de ocorrência e o procedimento de guarda documental.
 
 ## Edição individual de lotações
 
