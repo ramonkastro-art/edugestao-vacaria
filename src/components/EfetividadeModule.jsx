@@ -5,7 +5,16 @@ import {
 } from 'lucide-react'
 import { useEscolas, useServidoresByEscola, useEfetividade } from '../hooks/useData'
 
-const OCORRENCIAS = ['Atestado', 'Falta', 'Licença', 'Abono', 'Outro']
+const OCORRENCIAS = ['Atestado', 'Falta sem atestado', 'Licença', 'Abono', 'Outro motivo de ausência']
+
+const OCORRENCIA_LEGADA = {
+  Falta: 'Falta sem atestado',
+  Outro: 'Outro motivo de ausência',
+}
+
+function rotuloOcorrencia(valor) {
+  return OCORRENCIA_LEGADA[valor] ?? valor
+}
 
 function mesAnoAtual() {
   const agora = new Date()
@@ -28,13 +37,13 @@ function StatusAtual({ registro }) {
     return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold"><CheckCircle2 size={11} /> Tudo OK</span>
   }
   if (registro?.status === 'ocorrencia') {
-    return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-semibold"><AlertCircle size={11} /> {registro.ocorrencia || 'Ocorrência'}</span>
+    return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-semibold"><AlertCircle size={11} /> {rotuloOcorrencia(registro.ocorrencia) || 'Ocorrência'}</span>
   }
   return <span className="inline-flex items-center px-2 py-1 rounded-full border border-dashed border-slate-200 text-slate-400 text-[10px] font-medium">Pendente</span>
 }
 
 function ServidorEfetividadeRow({ servidor, registro, disabled, saving, onSave, onOpenServidor }) {
-  const [ocorrencia, setOcorrencia] = useState(registro?.status === 'ocorrencia' ? (registro.ocorrencia ?? '') : '')
+  const [ocorrencia, setOcorrencia] = useState(registro?.status === 'ocorrencia' ? rotuloOcorrencia(registro.ocorrencia ?? '') : '')
   const [observacoes, setObservacoes] = useState(registro?.observacoes ?? '')
   const [mostrarObservacao, setMostrarObservacao] = useState(registro?.status === 'ocorrencia')
 
@@ -84,7 +93,7 @@ function ServidorEfetividadeRow({ servidor, registro, disabled, saving, onSave, 
         {temOcorrencia && <button type="button" onClick={() => setMostrarObservacao(valor => !valor)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium"><FileText size={13} /> Observação</button>}
       </div>
 
-      {temOcorrencia && mostrarObservacao && <div className="flex flex-col sm:flex-row gap-2 mt-2"><input value={observacoes} disabled={disabled || saving} onChange={event => setObservacoes(event.target.value)} placeholder="Ex.: atestado de 2 dias, protocolo ou observação da direção" className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 outline-none focus:border-[#0f789c] disabled:opacity-60" /><button type="button" onClick={salvarObservacao} disabled={disabled || saving || !observacaoAlterada} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl brand-primary text-white text-xs font-semibold disabled:opacity-40"><Check size={13} /> Salvar</button></div>}
+      {temOcorrencia && mostrarObservacao && <div className="flex flex-col sm:flex-row gap-2 mt-2"><input value={observacoes} disabled={disabled || saving} onChange={event => setObservacoes(event.target.value)} placeholder={ocorrencia === 'Falta sem atestado' ? 'Informe, se necessário, o motivo ou a observação da direção' : 'Ex.: atestado de 2 dias, protocolo ou observação da direção'} className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 outline-none focus:border-[#0f789c] disabled:opacity-60" /><button type="button" onClick={salvarObservacao} disabled={disabled || saving || !observacaoAlterada} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl brand-primary text-white text-xs font-semibold disabled:opacity-40"><Check size={13} /> Salvar</button></div>}
     </div>
   )
 }
@@ -152,7 +161,7 @@ export default function EfetividadeModule({ onOpenServidor, canEdit = false, esc
         <div className="p-6 bg-[#fff3df] border border-[#f8d6a5] rounded-2xl text-sm text-[#8f4d0b]"><p className="font-semibold">Comece selecionando uma escola.</p><p className="text-xs mt-1">A diretora ou gestora confere os servidores da unidade na competência escolhida.</p></div>
       ) : (
         <>
-          <div className="flex items-center gap-2 p-3 bg-[#e7f5f7] border border-[#c7e5ea] rounded-2xl text-sm text-[#0b5e7d]"><FileText size={16} /><span>Competência <strong>{mesLabel(mesAno)}</strong>. Para cada servidor, marque <strong>Tudo OK</strong> ou registre uma ocorrência, como atestado.</span></div>
+          <div className="flex items-center gap-2 p-3 bg-[#e7f5f7] border border-[#c7e5ea] rounded-2xl text-sm text-[#0b5e7d]"><FileText size={16} /><span>Competência <strong>{mesLabel(mesAno)}</strong>. Para cada servidor, marque <strong>Tudo OK</strong> ou registre uma ocorrência, como atestado ou falta sem atestado.</span></div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="brand-card-blue rounded-2xl p-4"><Users size={16} className="text-[#0f789c] mb-2" /><p className="text-2xl font-semibold text-[#0b5e7d]">{total}</p><p className="text-xs text-slate-500 mt-0.5">Servidores na unidade</p></div>
             <div className="brand-card-green rounded-2xl p-4"><CheckCircle2 size={16} className="text-[#3c9c5a] mb-2" /><p className="text-2xl font-semibold text-[#287346]">{tudoOk}</p><p className="text-xs text-slate-500 mt-0.5">Tudo OK</p></div>
