@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS servidores (
   tipo_vinculo     TEXT CHECK (tipo_vinculo IN
                      ('Efetivo','Designação','Contratado','Temporário','Estágio')),
   matricula        TEXT,
+  cpf              TEXT,
   email            TEXT,
   telefone         TEXT,
   data_nascimento  DATE,
