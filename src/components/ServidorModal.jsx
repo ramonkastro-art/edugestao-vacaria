@@ -384,9 +384,9 @@ export default function ServidorModal({
                               {formatarData(lotacao.data_inicio)} {atual ? '· presente' : `· ${formatarData(lotacao.data_fim)}`}
                             </p>
                             {lotacao.motivo_saida && <p className="text-xs text-slate-400 mt-1">Motivo: {lotacao.motivo_saida}</p>}
-                            {canEdit && !atual && onEditHistorico && (
+                            {canEdit && onEditHistorico && (
                               <button onClick={() => onEditHistorico(lotacao)} className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-100 transition-colors">
-                                <Edit2 size={12} /> Editar histórico
+                                <Edit2 size={12} /> {atual ? 'Editar vínculo atual' : 'Editar histórico'}
                               </button>
                             )}
                           </div>

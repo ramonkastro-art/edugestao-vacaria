@@ -65,12 +65,19 @@ O JSON legado com nomes e lotações foi removido de `src/` porque não era impo
 - **Unidades** com filtro por modalidade e quadro atual;
 - **Servidores** com busca, filtro de escola e status;
 - **Perfil do servidor** com dados, vínculos atuais e histórico de escolas;
-- **Edição cadastral** sem reabrir vínculos encerrados;
+- **Edição cadastral** sem alterar vínculos de outras escolas;
+- **Edição individual de lotações** atuais e históricas, com correção de início, fim e motivo;
 - **Transferência** e inclusão manual de passagem histórica;
 - **Efetividade mensal** somente para lotações atuais;
 - **Solicitações de transferência** com filtros e exportação;
 - **Busca global** por servidor ou unidade;
 - **PWA** instalável, sem cachear sessões ou respostas do Supabase.
+
+## Edição individual de lotações
+
+Na aba **Histórico**, cada vínculo possui a ação **Editar vínculo atual** ou **Editar histórico**. É possível corrigir a data de início de uma lotação atual, encerrá-la informando data de fim e motivo, ou corrigir um vínculo já encerrado. Escolher **Atual** envia `data_fim = NULL`; escolher **Encerrada** exige uma data de saída. A alteração é individual, não apaga o registro e não altera os demais vínculos do servidor.
+
+A RPC `editar_historico_lotacao` deve ser reaplicada após o deploy do frontend para habilitar a edição de vínculos atuais. Ela impede datas futuras, períodos invertidos e sobreposição na mesma escola, mas permite que o servidor mantenha vínculos simultâneos em escolas diferentes.
 
 ## Progressive Web App
 
