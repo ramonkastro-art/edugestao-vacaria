@@ -15,6 +15,7 @@ import AdicionarHistoricoLotacaoModal from './components/AdicionarHistoricoLotac
 import EditarHistoricoLotacaoModal from './components/EditarHistoricoLotacaoModal'
 import SolicitacaoTransferenciaModal from './components/SolicitacaoTransferenciaModal'
 import EfetividadeModule from './components/EfetividadeModule'
+import TrocaSenhaObrigatoria from './components/TrocaSenhaObrigatoria'
 import {
   useEscolas, useServidores, useDashboardStats, buscarGlobal,
 } from './hooks/useData'
@@ -410,13 +411,13 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
         <div><h1 className="text-xl font-semibold text-slate-900">Servidores</h1><p className="text-sm text-slate-500 mt-0.5">{servidores.length} cadastrados · rede municipal</p></div>
         <div className="flex gap-2 ml-auto">
           <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><RefreshCw size={16} className="text-slate-500"/></button>
-          <button onClick={onNovoServidor} className="flex items-center gap-1.5 px-3 py-2 brand-primary text-white rounded-xl text-sm font-medium transition-colors">
+          {canEdit && <button onClick={onNovoServidor} className="flex items-center gap-1.5 px-3 py-2 brand-primary text-white rounded-xl text-sm font-medium transition-colors">
             <UserPlus size={15}/> Novo
-          </button>
+          </button>}
         </div>
       </div>
       <DataBanner error={error} migrationWarning={migrationWarning}/>
-      {!canEdit && <div className="p-3 bg-slate-100 border border-slate-200 rounded-2xl text-xs text-slate-600">Seu perfil está em modo de consulta. A edição de servidores e vínculos exige role <strong>secretaria</strong> ou <strong>rh</strong> no Supabase.</div>}
+      {!canEdit && <div className="p-3 bg-slate-100 border border-slate-200 rounded-2xl text-xs text-slate-600">Seu perfil está em modo de consulta. A edição exige perfil administrativo ou diretora vinculada a uma escola no Supabase.</div>}
       <div className="space-y-2">
         <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
           <Search size={15} className="text-slate-400"/>
@@ -481,6 +482,8 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
 export default function App() {
   const {user,profile,loading,profileLoading,profileError,signOut}=useAuth()
   const admin=isAdmin(profile)
+  const diretora=profile?.role==='diretor' && Boolean(profile?.escola_id)
+  const podeGerenciarServidor=admin || diretora
   const {escolas}=useEscolas()
   const [view,setView]=useState('dashboard')
   const [selectedSchool,setSelectedSchool]=useState(null)
@@ -525,6 +528,7 @@ export default function App() {
 
   if(loading)return<div className="min-h-screen brand-page-bg flex items-center justify-center"><Loader2 size={32} className="animate-spin text-slate-400"/></div>
   if(!user)return<LoginPage/>
+  if(profile?.exigir_troca_senha)return<TrocaSenhaObrigatoria/>
 
   function handleSelectSchool(escola){setSelectedSchool(escola);setView('school-detail')}
   function navigate(id){setView(id);setSelectedSchool(null)}
@@ -599,7 +603,7 @@ export default function App() {
               <Icon size={17} className="shrink-0"/>{sidebarOpen&&<span>{label}</span>}
             </button>
           ))}
-          {sidebarOpen&&admin&&(
+          {sidebarOpen&&podeGerenciarServidor&&(
             <button onClick={openNovoServidor}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-emerald-600 hover:bg-emerald-50 transition-all mt-2">
               <UserPlus size={17} className="shrink-0"/><span>Novo Servidor</span>
@@ -645,13 +649,13 @@ export default function App() {
           {view==='dashboard'&&<VisaoGeral onSelectSchool={handleSelectSchool}/>}
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
-          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={admin} refreshToken={dataVersion}/>}
-          {view==='efe'&&<EfetividadeModule onOpenServidor={setSelectedServidor} canEdit={Boolean(admin || profile?.role === 'diretor')} canManage={admin} escolaPermitidaId={profile?.role === 'diretor' ? profile?.escola_id : null}/>}
+          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={podeGerenciarServidor} refreshToken={dataVersion}/>}
+          {view==='efe'&&<EfetividadeModule onOpenServidor={setSelectedServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null}/>}
           {view==='relatorios'&&<Relatorios onEditSolicitacao={admin ? (item => { const servidor = allServidores.find(s => s.id === item.servidor_id) ?? item.servidor; setSolicitacaoTransferenciaEdit({ servidor, solicitacao: item }) }) : null}/>}
         </main>
       </div>
 
-      <BottomNav currentView={view} onNavigate={navigate} canCreate={admin}/>
+      <BottomNav currentView={view} onNavigate={navigate} canCreate={podeGerenciarServidor}/>
 
       {searchOpen&&<SearchOverlay onClose={()=>setSearchOpen(false)} onSelectSchool={handleSelectSchool} onOpenServidor={s=>setSelectedServidor(s)}/>}
 
@@ -659,12 +663,12 @@ export default function App() {
         <ServidorModal
           servidor={selectedServidor}
           onClose={()=>setSelectedServidor(null)}
-          onEdit={admin?openEditServidor:null}
+          onEdit={podeGerenciarServidor?openEditServidor:null}
           onTransfer={admin ? (srv => { setSelectedServidor(null); setTransferServidor(srv) }) : null}
           onAddHistorico={admin ? (srv => { setSelectedServidor(null); setHistoricoServidor(srv) }) : null}
           onEditHistorico={admin ? (lotacao => { setHistoricoLotacaoEdit({ servidor: selectedServidor, lotacao }); setSelectedServidor(null) }) : null}
           onAddSolicitacao={admin ? (srv => { setSolicitacaoTransferenciaEdit({ servidor: srv, solicitacao: null }); setSelectedServidor(null) }) : null}
-          canEdit={admin}
+          canEdit={podeGerenciarServidor}
           suspended={Boolean(editServidor)}
         />
       )}
@@ -714,6 +718,9 @@ export default function App() {
           onClose={()=>fecharEdicao(true)}
           onSaved={handleEditorSaved}
           onDeleted={()=>{handleDataChanged();fecharEdicao(false);setSelectedServidor(null)}}
+          escolaPermitidaId={diretora ? profile?.escola_id : null}
+          somenteEscola={diretora}
+          podeExcluir={admin}
         />
       )}
     </div>

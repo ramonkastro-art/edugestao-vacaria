@@ -49,7 +49,9 @@ Em um banco novo, execute o `schema_v2.sql` e depois as migrações necessárias
 | 6 | `migration_security_hardening.sql` | Corrige a política recursiva de `user_profiles`. |
 | 7 | `migration_exclusao_segura_servidores.sql` | Habilita exclusão definitiva com aprovação, senha, auditoria e bloqueio por dependências. |
 | 8 | `migration_rpc_security_hardening.sql` | Remove execução anônima das RPCs de negócio e mantém acesso autenticado. |
-| 9 | `migration_admin_policies.sql` | Opcional: completa permissões somente se as tabelas legadas existirem. |
+| 9 | `migration_acesso_por_escola.sql` | Permite operação da diretora somente na própria unidade e cadastro atômico por escola. |
+| 10 | `migration_acesso_escola_teste.sql` | Adiciona troca obrigatória de senha e função administrativa para vincular o primeiro usuário. |
+| 11 | `migration_admin_policies.sql` | Opcional: completa permissões somente se as tabelas legadas existirem. |
 
 Não execute `migration_admin_policies.sql` em uma instalação v2 que não tenha as tabelas `professores` e `nomeacoes`. A migração `migration_historico_manual.sql` só é necessária quando o banco recebeu anteriormente uma versão antiga de `migration_historico_lotacoes.sql` que ainda não possuía a função de inclusão manual.
 
@@ -63,9 +65,25 @@ A antiga área `Dashboard` é apresentada na interface como **Visão Geral**, po
 
 ## Segurança e dados pessoais
 
-As tabelas de negócio usam RLS. A autorização de edição depende de uma linha correspondente em `user_profiles`, com role `secretaria` ou `rh`. A função `public.is_admin()` é `SECURITY DEFINER`, possui `search_path` fixado e substitui a política recursiva anterior do próprio perfil.
+As tabelas de negócio usam RLS. A autorização administrativa depende de uma linha correspondente em `user_profiles`, com role `secretaria` ou `rh`. A função `public.is_admin()` é `SECURITY DEFINER`, possui `search_path` fixado e substitui a política recursiva anterior do próprio perfil. O role `diretor` deve possuir `escola_id` preenchido; após `migration_acesso_por_escola.sql`, a diretora consulta e edita servidores da própria unidade, registra sua efetividade e cadastra novos servidores pela RPC atômica `criar_servidor_na_escola`. Transferências, alteração de lotações, histórico e exclusão definitiva permanecem administrativos.
 
 O JSON legado com nomes e lotações foi removido de `src/` porque não era importado pela aplicação e continha dados pessoais. Os dados de produção devem permanecer no Supabase. Os arquivos `seed.sql` e `seed_v2.sql` são apenas referências de inicialização; revise e redija os dados antes de armazená-los em repositório público ou executar em produção.
+
+## Acesso por escola
+
+Para criar um acesso escolar, primeiro convide o usuário em **Supabase > Authentication > Users > Invite user**. Depois que o usuário existir, execute, no SQL Editor administrativo, a função privada abaixo, sem colocar senha no banco ou no repositório:
+
+```sql
+SELECT public.configurar_diretora_escola(
+  'email-real-da-diretora@exemplo.com',
+  'Nome exato da escola',
+  'Nome da diretora'
+);
+```
+
+O usuário receberá o convite, definirá a própria senha e será direcionado à troca obrigatória da senha temporária. Para o primeiro teste da **EMEI Erlina Portela Gervino**, use o e-mail real informado pela diretora apenas no painel do Supabase e na chamada administrativa; não use endereço inventado nem senha compartilhada. Uma conta de e-mail só deve ficar vinculada a uma escola, salvo se o modelo de perfis for ampliado para múltiplas unidades.
+
+O RH da SMED continua com acesso total quando o perfil possui role `rh`; Secretaria mantém o mesmo acesso administrativo com role `secretaria`. O frontend apenas melhora a experiência, enquanto as políticas RLS e a RPC são a proteção efetiva no banco.
 
 ## Identidade visual
 

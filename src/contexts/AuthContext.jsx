@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, nome, role, escola_id')
+        .select('id, nome, role, escola_id, exigir_troca_senha')
         .eq('id', userId)
         .maybeSingle()
 
@@ -92,6 +92,24 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function trocarSenha(novaSenha) {
+    if (!novaSenha || novaSenha.length < 8) {
+      return { error: new Error('A nova senha deve ter pelo menos 8 caracteres.') }
+    }
+    try {
+      const { error: senhaError } = await supabase.auth.updateUser({ password: novaSenha })
+      if (senhaError) return { error: senhaError }
+
+      const { error: perfilError } = await supabase.rpc('concluir_troca_senha')
+      if (perfilError) return { error: perfilError }
+
+      setProfile(prev => prev ? { ...prev, exigir_troca_senha: false } : prev)
+      return { error: null }
+    } catch (error) {
+      return { error: normalizarErro(error, 'Não foi possível atualizar a senha.') }
+    }
+  }
+
   async function signOut() {
     try {
       const { error } = await supabase.auth.signOut()
@@ -102,7 +120,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, profileLoading, profileError, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, profileLoading, profileError, signIn, trocarSenha, signOut }}>
       {children}
     </AuthContext.Provider>
   )

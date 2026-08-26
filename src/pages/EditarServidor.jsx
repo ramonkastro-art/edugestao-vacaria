@@ -117,7 +117,7 @@ function ConfirmModal({ nome, onConfirm, onCancel, loading = false, erro = '' })
   )
 }
 
-export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, escolas = [], isNovo = false }) {
+export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, escolas = [], isNovo = false, escolaPermitidaId = null, somenteEscola = false, podeExcluir = false }) {
   const [form, setForm] = useState({
     nome:            servidor?.nome            ?? '',
     status:          servidor?.status          ?? 'Ativo',
@@ -134,9 +134,10 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   })
 
   // Escolas vinculadas (ids como strings)
-  const [escolasSel, setEscolasSel] = useState(
-    (servidor?.lotacoes ?? []).filter(l => !l.data_fim).map(l => String(l.escola_id))
-  )
+  const [escolasSel, setEscolasSel] = useState(() => {
+    if (somenteEscola && escolaPermitidaId) return [String(escolaPermitidaId)]
+    return (servidor?.lotacoes ?? []).filter(l => !l.data_fim).map(l => String(l.escola_id))
+  })
 
   const [saving, setSaving]   = useState(false)
   const [inativando, setInativando] = useState(false)
@@ -179,7 +180,10 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
     const dadosParaSalvar = form
     let error
     if (isNovo) {
-      const res = await criarServidor(dadosParaSalvar, escolasSel)
+      const res = await criarServidor(dadosParaSalvar, escolasSel, somenteEscola ? escolaPermitidaId : null)
+      error = res.error
+    } else if (somenteEscola) {
+      const res = await atualizarServidor(servidor.id, dadosParaSalvar)
       error = res.error
     } else {
       const [r1, r2] = await Promise.all([
@@ -214,6 +218,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   }
 
   async function handleDelete(senha) {
+    if (!podeExcluir) return
     setDeleting(true)
     setDeleteError('')
     const { error } = await excluirServidorDefinitivo(servidor.id, senha)
@@ -359,11 +364,17 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
               </div>
             </div>
 
-            {/* Escolas vinculadas como tags */}
+              {/* Escolas vinculadas como tags */}
             <div>
               <FieldLabel>Escola(s) de lotação</FieldLabel>
 
-              {escolasVinculadas.length > 0 && (
+              {somenteEscola && escolaPermitidaId ? (
+                <div className="flex items-center gap-2 px-3 py-3 bg-[#e7f5f7] border border-[#c7e5ea] rounded-xl text-sm text-[#0b5e7d]">
+                  <School size={15} />
+                  <span className="truncate">{escolas.find(escola => String(escola.id) === String(escolaPermitidaId))?.name || 'Escola vinculada ao perfil'}</span>
+                  <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide">Unidade do acesso</span>
+                </div>
+              ) : escolasVinculadas.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {escolasVinculadas.map(e => (
                     <div key={e.id}
@@ -379,7 +390,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
                 </div>
               )}
 
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors">
+              {!somenteEscola && <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors">
                 <School size={14} className="text-slate-400 shrink-0" />
                 <select
                   className="flex-1 bg-transparent text-sm outline-none text-slate-600 cursor-pointer"
@@ -399,8 +410,8 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
                     </optgroup>
                   ))}
                 </select>
-              </div>
-              {escolasVinculadas.length === 0 && (
+              </div>}
+              {!somenteEscola && escolasVinculadas.length === 0 && (
                 <p className="text-xs text-slate-400 mt-1">Nenhuma escola vinculada</p>
               )}
             </div>
@@ -439,7 +450,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
               {inativando ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}<span className="hidden sm:inline">{inativando ? 'Inativando…' : 'Inativar'}</span>
             </button>
           )}
-          {!isNovo && (
+          {!isNovo && podeExcluir && (
             <button type="button" onClick={() => { setDeleteError(''); setConfirmDel(true) }} aria-label="Excluir definitivamente" title="Excluir definitivamente"
               className="flex items-center gap-1.5 px-3 sm:px-4 py-3 border border-red-200 text-red-500 rounded-2xl text-sm font-medium hover:bg-red-50 transition-colors">
               <Trash2 size={14} /><span className="hidden sm:inline">Excluir</span>

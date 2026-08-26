@@ -488,8 +488,29 @@ export async function salvarSolicitacaoTransferencia({ id, servidorId, escolaOri
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
-export async function criarServidor(dados, escolaIds = []) {
+export async function criarServidor(dados, escolaIds = [], escolaRestritaId = null) {
   try {
+    if (escolaRestritaId) {
+      const { data, error } = await supabase.rpc('criar_servidor_na_escola', {
+        p_escola_id: Number(escolaRestritaId),
+        p_dados: {
+          nome: dados.nome,
+          status: dados.status,
+          funcao: dados.funcao,
+          tipo_vinculo: dados.tipo_vinculo,
+          matricula: dados.matricula,
+          email: dados.email,
+          telefone: dados.telefone,
+          data_nascimento: dados.data_nascimento,
+          endereco: dados.endereco,
+          formacao: dados.formacao,
+          cpf: dados.cpf,
+          observacoes: dados.observacoes,
+        },
+      })
+      return { data, error }
+    }
+
     const { data: servidor, error } = await supabase
       .from('servidores')
       .insert({
