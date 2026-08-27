@@ -592,6 +592,18 @@ export async function inativarServidor(id) {
   }
 }
 
+export async function reativarServidor(id) {
+  try {
+    const { error } = await supabase
+      .from('servidores')
+      .update({ status: 'Ativo' })
+      .eq('id', id)
+    return { error }
+  } catch (error) {
+    return { error: comoErro(error, 'Não foi possível reativar o servidor.') }
+  }
+}
+
 export async function excluirServidorDefinitivo(id, senha) {
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser()

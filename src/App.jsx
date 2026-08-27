@@ -17,7 +17,7 @@ import SolicitacaoTransferenciaModal from './components/SolicitacaoTransferencia
 import EfetividadeModule from './components/EfetividadeModule'
 import TrocaSenhaObrigatoria from './components/TrocaSenhaObrigatoria'
 import {
-  useEscolas, useServidores, useDashboardStats, buscarGlobal,
+  useEscolas, useServidores, useServidoresByEscola, useDashboardStats, buscarGlobal,
 } from './hooks/useData'
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────

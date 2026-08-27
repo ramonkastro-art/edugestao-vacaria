@@ -65,7 +65,7 @@ A antiga área `Dashboard` é apresentada na interface como **Visão Geral**, po
 
 ## Segurança e dados pessoais
 
-As tabelas de negócio usam RLS. A autorização administrativa depende de uma linha correspondente em `user_profiles`, com role `secretaria` ou `rh`. A função `public.is_admin()` é `SECURITY DEFINER`, possui `search_path` fixado e substitui a política recursiva anterior do próprio perfil. O role `diretor` deve possuir `escola_id` preenchido; após `migration_acesso_por_escola.sql`, a diretora consulta e edita servidores da própria unidade, registra sua efetividade e cadastra novos servidores pela RPC atômica `criar_servidor_na_escola`. Transferências, alteração de lotações, histórico e exclusão definitiva permanecem administrativos.
+As tabelas de negócio usam RLS. A autorização administrativa depende de uma linha correspondente em `user_profiles`, com role `secretaria` ou `rh`. A função `public.is_admin()` é `SECURITY DEFINER`, possui `search_path` fixado e substitui a política recursiva anterior do próprio perfil. O role `diretor` deve possuir `escola_id` preenchido; após `migration_acesso_por_escola.sql`, a diretora consulta e edita servidores da própria unidade, cadastra novos servidores pela RPC atômica `criar_servidor_na_escola`, inativa e reativa seus servidores e registra a efetividade da escola. A interface não permite alterar lotações, histórico ou excluir definitivamente; essas operações permanecem administrativas.
 
 O JSON legado com nomes e lotações foi removido de `src/` porque não era importado pela aplicação e continha dados pessoais. Os dados de produção devem permanecer no Supabase. Os arquivos `seed.sql` e `seed_v2.sql` são apenas referências de inicialização; revise e redija os dados antes de armazená-los em repositório público ou executar em produção.
 
@@ -83,7 +83,7 @@ SELECT public.configurar_diretora_escola(
 
 O usuário receberá o convite, definirá a própria senha e será direcionado à troca obrigatória da senha temporária. Para o primeiro teste da **EMEI Erlina Portela Gervino**, use o e-mail real informado pela diretora apenas no painel do Supabase e na chamada administrativa; não use endereço inventado nem senha compartilhada. Uma conta de e-mail só deve ficar vinculada a uma escola, salvo se o modelo de perfis for ampliado para múltiplas unidades.
 
-O RH da SMED continua com acesso total quando o perfil possui role `rh`; Secretaria mantém o mesmo acesso administrativo com role `secretaria`. O frontend apenas melhora a experiência, enquanto as políticas RLS e a RPC são a proteção efetiva no banco.
+O RH da SMED continua com acesso total quando o perfil possui role `rh`; Secretaria mantém o mesmo acesso administrativo com role `secretaria`. O frontend apenas melhora a experiência, enquanto as políticas RLS e a RPC são a proteção efetiva no banco. A correção do bundle inclui a importação de `useServidoresByEscola`, necessária para o quadro de cada unidade.
 
 ## Identidade visual
 

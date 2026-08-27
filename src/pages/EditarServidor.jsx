@@ -4,7 +4,7 @@ import {
   School, Hash, Save, Loader2, AlertCircle, CheckCircle2,
   ArrowLeft, Trash2, X, UserMinus, GraduationCap,
 } from 'lucide-react'
-import { atualizarServidor, atualizarLotacoes, inativarServidor, excluirServidorDefinitivo, criarServidor } from '../hooks/useData'
+import { atualizarServidor, atualizarLotacoes, inativarServidor, reativarServidor, excluirServidorDefinitivo, criarServidor } from '../hooks/useData'
 
 const FUNCOES = [
   { g: 'Docentes',              v: 'Professor(a) Ed. Básica I' },
@@ -211,6 +211,21 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
     setInativando(false)
     if (error) {
       setErro(error.message || 'Não foi possível inativar o servidor.')
+      return
+    }
+    setSaved(true)
+    setTimeout(() => { onSaved ? onSaved() : onClose?.() }, 800)
+  }
+
+  async function handleReativar() {
+    if (isNovo || !servidor?.id) return
+    setInativando(true)
+    setErro('')
+    setSaved(false)
+    const { error } = await reativarServidor(servidor.id)
+    setInativando(false)
+    if (error) {
+      setErro(error.message || 'Não foi possível reativar o servidor.')
       return
     }
     setSaved(true)
@@ -448,6 +463,12 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
             <button type="button" onClick={handleInativar} disabled={saving || inativando} aria-label="Inativar servidor" title="Inativar servidor"
               className="flex items-center gap-1.5 px-3 sm:px-4 py-3 border border-amber-200 text-amber-700 rounded-2xl text-sm font-medium hover:bg-amber-50 transition-colors disabled:opacity-50">
               {inativando ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}<span className="hidden sm:inline">{inativando ? 'Inativando…' : 'Inativar'}</span>
+            </button>
+          )}
+          {!isNovo && form.status === 'Inativo' && (
+            <button type="button" onClick={handleReativar} disabled={saving || inativando} aria-label="Reativar servidor" title="Reativar servidor"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-3 border border-emerald-200 text-emerald-700 rounded-2xl text-sm font-medium hover:bg-emerald-50 transition-colors disabled:opacity-50">
+              {inativando ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} className="rotate-180" />}<span className="hidden sm:inline">{inativando ? 'Reativando…' : 'Reativar'}</span>
             </button>
           )}
           {!isNovo && podeExcluir && (

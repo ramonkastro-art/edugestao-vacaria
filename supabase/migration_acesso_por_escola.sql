@@ -65,6 +65,29 @@ CREATE POLICY "servidores_diretor_update"
       AND l.data_fim IS NULL
   ));
 
+-- Relatórios podem mostrar solicitações que envolvam a escola da diretora,
+-- mas a criação, alteração e atendimento continuam administrativos.
+DROP POLICY IF EXISTS "solicitacoes_transferencia_diretor_read" ON public.solicitacoes_transferencia;
+CREATE POLICY "solicitacoes_transferencia_diretor_read"
+  ON public.solicitacoes_transferencia
+  FOR SELECT TO authenticated
+  USING (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    WHERE up.id = auth.uid()
+      AND up.role = 'diretor'
+      AND (
+        solicitacoes_transferencia.escola_origem_id = up.escola_id
+        OR solicitacoes_transferencia.escola_destino_id = up.escola_id
+        OR EXISTS (
+          SELECT 1
+          FROM public.lotacoes l
+          WHERE l.servidor_id = solicitacoes_transferencia.servidor_id
+            AND l.escola_id = up.escola_id
+        )
+      )
+  ));
+
 -- Cadastro atômico de servidor + primeira lotação.
 -- O cliente nunca recebe permissão para inserir diretamente em lotacoes.
 CREATE OR REPLACE FUNCTION public.criar_servidor_na_escola(
