@@ -17,7 +17,7 @@ import SolicitacaoTransferenciaModal from './components/SolicitacaoTransferencia
 import EfetividadeModule from './components/EfetividadeModule'
 import TrocaSenhaObrigatoria from './components/TrocaSenhaObrigatoria'
 import {
-  useEscolas, useServidores, useServidoresByEscola, useDashboardStats, buscarGlobal,
+  useEscolas, useServidores, useServidoresByEscola, useEfetividade, useDashboardStats, buscarGlobal,
 } from './hooks/useData'
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ function VisaoGeral({ onSelectSchool }) {
       <div>
         <h2 className="text-sm font-semibold text-slate-700 mb-3">Por modalidade</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {['EMEF','EMEI','EMEF Campo','SMED'].map(tipo=>{
+          {['EMEF','EMEI','EMEF Campo'].map(tipo=>{
             const count=escolas.filter(e=>e.tipo===tipo).length
             return (
               <div key={tipo} className="p-3 bg-white border border-slate-100 rounded-2xl">
@@ -250,7 +250,7 @@ function VisaoGeral({ onSelectSchool }) {
         </div>
       </div>
       <div>
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">Todas as unidades</h2>
+        <h2 className="text-sm font-semibold text-slate-700 mb-3">Todas as unidades cadastradas</h2>
         <div className="grid sm:grid-cols-2 gap-2">
           {escolas.map(escola=>(
             <div key={escola.id} onClick={()=>onSelectSchool(escola)}
@@ -383,7 +383,7 @@ function SchoolQuadro({ escola, onBack, onOpenServidor }) {
 
 // ─── SERVIDORES LIST ─────────────────────────────────────────────────────────
 
-function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refreshToken }) {
+function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, escolaPermitidaId = null, refreshToken }) {
   const {servidores,loading,reload,error,migrationWarning}=useServidores()
   const {escolas}=useEscolas()
   const [search,setSearch]=useState('')
@@ -456,7 +456,7 @@ function ServidoresList({ onOpenServidor, onNovoServidor, onEdit, canEdit, refre
                 </div>
                 <p className="text-xs text-slate-400 truncate mt-0.5">{escNomes.join(' · ')||'Sem escola vinculada'}</p>
               </div>
-              {canEdit && (
+              {canEdit && (!escolaPermitidaId || (s.lotacoes ?? []).some(lotacao => String(lotacao.escola_id) === String(escolaPermitidaId) && !lotacao.data_fim)) && (
                 <button
                   onClick={event => { event.stopPropagation(); onEdit(s) }}
                   className="inline-flex items-center gap-1.5 p-2.5 sm:px-2.5 sm:py-2 rounded-xl text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors shrink-0"
@@ -532,6 +532,10 @@ export default function App() {
 
   function handleSelectSchool(escola){setSelectedSchool(escola);setView('school-detail')}
   function navigate(id){setView(id);setSelectedSchool(null)}
+  function podeEditarServidor(srv){
+    if (admin) return true
+    return diretora && (srv?.lotacoes ?? []).some(lotacao => String(lotacao.escola_id) === String(profile.escola_id) && !lotacao.data_fim)
+  }
   function openNovoServidor(){
     setEditarRetorno(null)
     setIsNovo(true)
@@ -649,7 +653,7 @@ export default function App() {
           {view==='dashboard'&&<VisaoGeral onSelectSchool={handleSelectSchool}/>}
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
-          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={podeGerenciarServidor} refreshToken={dataVersion}/>}
+          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null} refreshToken={dataVersion}/>}
           {view==='efe'&&<EfetividadeModule onOpenServidor={setSelectedServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null}/>}
           {view==='relatorios'&&<Relatorios onEditSolicitacao={admin ? (item => { const servidor = allServidores.find(s => s.id === item.servidor_id) ?? item.servidor; setSolicitacaoTransferenciaEdit({ servidor, solicitacao: item }) }) : null}/>}
         </main>
@@ -663,12 +667,12 @@ export default function App() {
         <ServidorModal
           servidor={selectedServidor}
           onClose={()=>setSelectedServidor(null)}
-          onEdit={podeGerenciarServidor?openEditServidor:null}
+          onEdit={podeEditarServidor(selectedServidor)?openEditServidor:null}
           onTransfer={admin ? (srv => { setSelectedServidor(null); setTransferServidor(srv) }) : null}
           onAddHistorico={admin ? (srv => { setSelectedServidor(null); setHistoricoServidor(srv) }) : null}
           onEditHistorico={admin ? (lotacao => { setHistoricoLotacaoEdit({ servidor: selectedServidor, lotacao }); setSelectedServidor(null) }) : null}
           onAddSolicitacao={admin ? (srv => { setSolicitacaoTransferenciaEdit({ servidor: srv, solicitacao: null }); setSelectedServidor(null) }) : null}
-          canEdit={podeGerenciarServidor}
+          canEdit={podeEditarServidor(selectedServidor)}
           suspended={Boolean(editServidor)}
         />
       )}

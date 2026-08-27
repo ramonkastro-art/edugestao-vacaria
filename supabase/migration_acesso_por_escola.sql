@@ -3,6 +3,76 @@
 -- e migration_rpc_security_hardening.sql já aplicados.
 -- Não cria usuários no Auth; o usuário deve ser convidado pelo painel do Supabase.
 
+-- A diretora pode consultar a rede de servidores, conforme decisão funcional.
+-- A restrição de escola é aplicada às escritas, não à leitura.
+-- Removemos todas as policies antigas de servidores para evitar que uma policy
+-- permissiva esquecida se some às policies de escrita.
+DO $$
+DECLARE
+  politica RECORD;
+BEGIN
+  FOR politica IN
+    SELECT policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'servidores'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.servidores', politica.policyname);
+  END LOOP;
+END;
+$$;
+
+CREATE POLICY "servidores_admin_all"
+  ON public.servidores
+  FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    WHERE up.id = auth.uid()
+      AND up.role IN ('secretaria', 'rh')
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    WHERE up.id = auth.uid()
+      AND up.role IN ('secretaria', 'rh')
+  ));
+
+-- Consulta ampla para diretora, conforme solicitado. As lotações retornadas
+-- continuam filtradas pela policy de lotacoes da própria escola.
+CREATE POLICY "servidores_diretor_read_rede"
+  ON public.servidores
+  FOR SELECT TO authenticated
+  USING (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    WHERE up.id = auth.uid()
+      AND up.role = 'diretor'
+  ));
+
+-- Escrita exclusivamente em servidor que possua lotação atual na escola do perfil.
+CREATE POLICY "servidores_diretor_update_propria_escola"
+  ON public.servidores
+  FOR UPDATE TO authenticated
+  USING (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    JOIN public.lotacoes l ON l.servidor_id = servidores.id
+    WHERE up.id = auth.uid()
+      AND up.role = 'diretor'
+      AND l.escola_id = up.escola_id
+      AND l.data_fim IS NULL
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    JOIN public.lotacoes l ON l.servidor_id = servidores.id
+    WHERE up.id = auth.uid()
+      AND up.role = 'diretor'
+      AND l.escola_id = up.escola_id
+      AND l.data_fim IS NULL
+  ));
+
 -- Escolas: administradores e perfis não-diretora continuam vendo a rede;
 -- uma diretora vê somente a escola vinculada ao próprio perfil.
 DROP POLICY IF EXISTS "escolas_read" ON public.escolas;
@@ -25,48 +95,76 @@ CREATE POLICY "escolas_read"
     )
   );
 
--- Servidores: a diretora consulta apenas servidores com lotação atual na sua escola.
-DROP POLICY IF EXISTS "servidores_diretor_read" ON public.servidores;
-CREATE POLICY "servidores_diretor_read"
-  ON public.servidores
-  FOR SELECT TO authenticated
+-- Lotações: a diretora consulta somente vínculos da própria escola.
+-- Inserção, alteração e exclusão permanecem administrativas.
+DROP POLICY IF EXISTS "lotacoes_admin" ON public.lotacoes;
+CREATE POLICY "lotacoes_admin"
+  ON public.lotacoes
+  FOR ALL TO authenticated
   USING (EXISTS (
     SELECT 1
     FROM public.user_profiles up
-    JOIN public.lotacoes l ON l.servidor_id = servidores.id
     WHERE up.id = auth.uid()
-      AND up.role = 'diretor'
-      AND l.escola_id = up.escola_id
-      AND l.data_fim IS NULL
-  ));
-
--- A edição cadastral não permite à diretora trocar a lotação; o frontend
--- também oculta os controles de escolas. Alterações passam por esta policy.
-DROP POLICY IF EXISTS "servidores_diretor_update" ON public.servidores;
-CREATE POLICY "servidores_diretor_update"
-  ON public.servidores
-  FOR UPDATE TO authenticated
-  USING (EXISTS (
-    SELECT 1
-    FROM public.user_profiles up
-    JOIN public.lotacoes l ON l.servidor_id = servidores.id
-    WHERE up.id = auth.uid()
-      AND up.role = 'diretor'
-      AND l.escola_id = up.escola_id
-      AND l.data_fim IS NULL
+      AND up.role IN ('secretaria', 'rh')
   ))
   WITH CHECK (EXISTS (
     SELECT 1
     FROM public.user_profiles up
-    JOIN public.lotacoes l ON l.servidor_id = servidores.id
+    WHERE up.id = auth.uid()
+      AND up.role IN ('secretaria', 'rh')
+  ));
+
+DROP POLICY IF EXISTS "lotacoes_diretor_read" ON public.lotacoes;
+CREATE POLICY "lotacoes_diretor_read"
+  ON public.lotacoes
+  FOR SELECT TO authenticated
+  USING (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
     WHERE up.id = auth.uid()
       AND up.role = 'diretor'
-      AND l.escola_id = up.escola_id
-      AND l.data_fim IS NULL
+      AND up.escola_id = lotacoes.escola_id
+  ));
+
+-- Efetividade: administradores e diretora da própria escola.
+DROP POLICY IF EXISTS "efe_admin" ON public.efetividade;
+CREATE POLICY "efe_admin"
+  ON public.efetividade
+  FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    WHERE up.id = auth.uid()
+      AND up.role IN ('secretaria', 'rh')
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    WHERE up.id = auth.uid()
+      AND up.role IN ('secretaria', 'rh')
+  ));
+
+DROP POLICY IF EXISTS "efe_diretor" ON public.efetividade;
+CREATE POLICY "efe_diretor"
+  ON public.efetividade
+  FOR ALL TO authenticated
+  USING (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    WHERE up.id = auth.uid()
+      AND up.role = 'diretor'
+      AND up.escola_id = efetividade.escola_id
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1
+    FROM public.user_profiles up
+    WHERE up.id = auth.uid()
+      AND up.role = 'diretor'
+      AND up.escola_id = efetividade.escola_id
   ));
 
 -- Relatórios podem mostrar solicitações que envolvam a escola da diretora,
--- mas a criação, alteração e atendimento continuam administrativos.
+-- mas criação, alteração e atendimento continuam administrativos.
 DROP POLICY IF EXISTS "solicitacoes_transferencia_diretor_read" ON public.solicitacoes_transferencia;
 CREATE POLICY "solicitacoes_transferencia_diretor_read"
   ON public.solicitacoes_transferencia

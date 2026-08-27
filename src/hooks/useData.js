@@ -320,7 +320,7 @@ export function useDashboardStats() {
       try {
         const [servidoresResult, escolasResult] = await Promise.all([
           supabase.from('servidores').select('id, status', { count: 'exact' }).neq('status', 'Inativo'),
-          supabase.from('escolas').select('*', { count: 'exact', head: true }),
+          supabase.from('escolas').select('*', { count: 'exact', head: true }).neq('tipo', 'SMED'),
         ])
         let lotacoesResult = await supabase
           .from('lotacoes')
@@ -570,6 +570,8 @@ export async function atualizarServidor(id, dados) {
         observacoes: dados.observacoes?.trim() || null,
       })
       .eq('id', id)
+      .select('id')
+      .single()
     return { data, error }
   } catch (error) {
     return { error: comoErro(error, 'Não foi possível atualizar o servidor.') }
@@ -582,11 +584,13 @@ export async function atualizarLotacoes(servidorId, escolaIds = []) {
 
 export async function inativarServidor(id) {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('servidores')
       .update({ status: 'Inativo' })
       .eq('id', id)
-    return { error }
+      .select('id')
+      .single()
+    return { data, error }
   } catch (error) {
     return { error: comoErro(error, 'Não foi possível inativar o servidor.') }
   }
@@ -594,11 +598,13 @@ export async function inativarServidor(id) {
 
 export async function reativarServidor(id) {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('servidores')
       .update({ status: 'Ativo' })
       .eq('id', id)
-    return { error }
+      .select('id')
+      .single()
+    return { data, error }
   } catch (error) {
     return { error: comoErro(error, 'Não foi possível reativar o servidor.') }
   }
