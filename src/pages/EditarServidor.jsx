@@ -65,6 +65,96 @@ function SelectInput({ icon: Icon, disabled, children, ...props }) {
     </div>
   )
 }
+
+function isoParaBr(value = '') {
+  const iso = String(value).slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ''
+  const [ano, mes, dia] = iso.split('-')
+  return `${dia}/${mes}/${ano}`
+}
+
+function brParaIso(value = '') {
+  const match = String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (!match) return null
+  const [, dia, mes, ano] = match
+  const data = new Date(Number(ano), Number(mes) - 1, Number(dia))
+  const hoje = new Date()
+  hoje.setHours(23, 59, 59, 999)
+  if (
+    data.getFullYear() !== Number(ano) ||
+    data.getMonth() !== Number(mes) - 1 ||
+    data.getDate() !== Number(dia) ||
+    data > hoje
+  ) return null
+  return `${ano}-${mes}-${dia}`
+}
+
+function DateTextInput({ value, onChange, onValidation }) {
+  const [draft, setDraft] = useState(() => isoParaBr(value))
+
+  useEffect(() => {
+    setDraft(isoParaBr(value))
+  }, [value])
+
+  function handleChange(event) {
+    const digits = event.target.value.replace(/\D/g, '').slice(0, 8)
+    const formatted = digits.length > 4
+      ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+      : digits.length > 2
+        ? `${digits.slice(0, 2)}/${digits.slice(2)}`
+        : digits
+    setDraft(formatted)
+
+    if (!formatted) {
+      onValidation?.('')
+      onChange('')
+      return
+    }
+    if (formatted.length < 10) {
+      onValidation?.('Complete a data no formato DD/MM/AAAA.')
+      return
+    }
+    const iso = brParaIso(formatted)
+    if (!iso) {
+      onValidation?.('Informe uma data de nascimento válida e não futura.')
+      return
+    }
+    onValidation?.('')
+    onChange(iso)
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-slate-400 transition-colors">
+        <Calendar size={15} className="shrink-0 text-slate-400" />
+        <input
+          type="text"
+          value={draft}
+          onChange={handleChange}
+          inputMode="numeric"
+          autoComplete="bday"
+          maxLength={10}
+          placeholder="DD/MM/AAAA"
+          aria-label="Data de nascimento"
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-300 text-slate-800"
+        />
+      </div>
+      <p className="text-[11px] text-slate-400 mt-1">Digite diretamente no formato dia/mês/ano.</p>
+      {onValidation && <DateValidationMessage value={draft} />}
+    </div>
+  )
+}
+
+function DateValidationMessage({ value }) {
+  if (!value) return null
+  if (value.length < 10) {
+    return <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={11} />Complete a data no formato DD/MM/AAAA.</p>
+  }
+  if (!brParaIso(value)) {
+    return <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={11} />Informe uma data válida e não futura.</p>
+  }
+  return null
+}
 function ConfirmModal({ nome, onConfirm, onCancel, loading = false, erro = '' }) {
   const [senha, setSenha] = useState('')
   const [nomeConfirmado, setNomeConfirmado] = useState('')
@@ -144,6 +234,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   const [saved, setSaved]     = useState(false)
   const [erro, setErro]       = useState('')
   const [errors, setErrors]   = useState({})
+  const [dateNascError, setDateNascError] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -169,6 +260,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
     if (!form.nome.trim()) errs.nome = 'Nome é obrigatório'
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       errs.email = 'E-mail inválido'
+    if (dateNascError) errs.data_nascimento = dateNascError
     setErrors(errs)
     return !Object.keys(errs).length
   }
@@ -310,8 +402,11 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
               </div>
               <div>
                 <FieldLabel>Nascimento</FieldLabel>
-                <Input icon={Calendar} type="date" value={form.data_nascimento}
-                  onChange={e => set('data_nascimento', e.target.value)} />
+                <DateTextInput
+                  value={form.data_nascimento}
+                  onChange={value => set('data_nascimento', value)}
+                  onValidation={setDateNascError}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
