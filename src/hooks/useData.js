@@ -5,7 +5,7 @@ const SERVIDORES_SELECT = `
   id, nome, nome_norm, status, funcao, tipo_vinculo, cpf,
   matricula, email, telefone, data_nascimento,
   endereco, formacao, regencia_h, htp_h, hti_h, observacoes,
-  lotacoes ( id, escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo) )
+  lotacoes ( id, escola_id, principal, data_inicio, data_fim, motivo_saida, funcao_original, funcao_categoria, turno_original, area_concurso_original, area_atuacao_categoria, turma_atuacao, vinculo_original, matricula_original, escola:escolas(id, name, tipo) )
 `
 
 const SERVIDORES_SELECT_COMPATIVEL = `
@@ -19,7 +19,7 @@ const SERVIDORES_POR_ESCOLA_SELECT = `
   escola_id, principal,
   servidor:servidores (
     id, nome, status, funcao, tipo_vinculo, cpf, matricula,
-    lotacoes ( id, escola_id, principal, data_inicio, data_fim, motivo_saida, escola:escolas(id, name, tipo) )
+    lotacoes ( id, escola_id, principal, data_inicio, data_fim, motivo_saida, funcao_original, funcao_categoria, turno_original, area_concurso_original, area_atuacao_categoria, turma_atuacao, vinculo_original, matricula_original, escola:escolas(id, name, tipo) )
   )
 `
 
@@ -103,16 +103,31 @@ export function useServidores() {
     setError('')
     setMigrationWarning(false)
     try {
-      let result = await supabase
-        .from('servidores')
-        .select(SERVIDORES_SELECT)
-        .order('nome')
+      const pageSize = 1000
+      const carregarPaginas = async (selectString) => {
+        const acumulado = []
+        let offset = 0
+
+        while (true) {
+          const result = await supabase
+            .from('servidores')
+            .select(selectString)
+            .order('nome')
+            .range(offset, offset + pageSize - 1)
+
+          if (result.error) return result
+          acumulado.push(...(result.data ?? []))
+          if ((result.data ?? []).length < pageSize) {
+            return { data: acumulado, error: null }
+          }
+          offset += pageSize
+        }
+      }
+
+      let result = await carregarPaginas(SERVIDORES_SELECT)
 
       if (result.error && erroDeSchema(result.error)) {
-        result = await supabase
-          .from('servidores')
-          .select(SERVIDORES_SELECT_COMPATIVEL)
-          .order('nome')
+        result = await carregarPaginas(SERVIDORES_SELECT_COMPATIVEL)
         setMigrationWarning(!result.error)
       }
 
@@ -484,6 +499,40 @@ export async function salvarSolicitacaoTransferencia({ id, servidorId, escolaOri
   } catch (error) {
     return { error: comoErro(error, 'Não foi possível salvar a solicitação.') }
   }
+}
+
+// ─── CATÁLOGOS PARA RELATÓRIOS ────────────────────────────────────────────────
+
+export function useCatalogosRelatorio() {
+  const [funcoes, setFuncoes] = useState([])
+  const [formacoes, setFormacoes] = useState([])
+  const [areas, setAreas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [funcoesResult, formacoesResult, areasResult] = await Promise.all([
+        supabase.from('funcoes_catalogo').select('nome').eq('ativo', true).order('nome'),
+        supabase.from('formacoes_catalogo').select('nome').eq('ativo', true).order('nome'),
+        supabase.from('areas_atuacao_catalogo').select('nome').eq('ativo', true).order('nome'),
+      ])
+      const errors = [funcoesResult.error, formacoesResult.error, areasResult.error].filter(Boolean)
+      setFuncoes((funcoesResult.data ?? []).map(item => item.nome).filter(Boolean))
+      setFormacoes((formacoesResult.data ?? []).map(item => item.nome).filter(Boolean))
+      setAreas((areasResult.data ?? []).map(item => item.nome).filter(Boolean))
+      setError(errors.length ? errors.map(item => mensagemErro(item)).join(' ') : '')
+    } catch (requestError) {
+      setError(mensagemErro(requestError, 'Não foi possível carregar os catálogos.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+  return { funcoes, formacoes, areas, loading, error, reload: load }
 }
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
