@@ -9,6 +9,7 @@ import { useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import EditarServidor from './pages/EditarServidor'
 import Relatorios from './pages/Relatorios'
+import RevisaoCadastros from './pages/RevisaoCadastros'
 import ServidorModal from './components/ServidorModal'
 import TransferirLotacaoModal from './components/TransferirLotacaoModal'
 import AdicionarHistoricoLotacaoModal from './components/AdicionarHistoricoLotacaoModal'
@@ -584,6 +585,7 @@ export default function App() {
     {id:'servidores', label:'Servidores', icon:Users},
     {id:'efe',        label:'Efetividade',icon:CheckCircle2},
     {id:'relatorios', label:'Relatórios', icon:FileText},
+    {id:'revisao', label:'Revisar cadastros', icon:AlertCircle},
   ]
   const currentNavId=view==='school-detail'?'schools':view
   const sideW=sidebarOpen?'w-56':'w-16'
@@ -656,6 +658,7 @@ export default function App() {
           {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null} refreshToken={dataVersion}/>}
           {view==='efe'&&<EfetividadeModule onOpenServidor={setSelectedServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null}/>}
           {view==='relatorios'&&<Relatorios onEditSolicitacao={admin ? (item => { const servidor = allServidores.find(s => s.id === item.servidor_id) ?? item.servidor; setSolicitacaoTransferenciaEdit({ servidor, solicitacao: item }) }) : null}/>}
+          {view==='revisao'&&<RevisaoCadastros servidores={allServidores} escolas={escolas} onEditServidor={openEditServidor} canEdit={podeGerenciarServidor} refreshToken={dataVersion}/>}
         </main>
       </div>
 
