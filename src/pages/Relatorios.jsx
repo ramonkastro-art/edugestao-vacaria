@@ -170,7 +170,6 @@ export default function Relatorios({ onEditSolicitacao }) {
   const [tipoRelatorio, setTipoRelatorio] = useState('servidores')
   const [modelo, setModelo] = useState('todos')
   const [busca, setBusca] = useState('')
-  const [grupo, setGrupo] = useState('')
   const [funcao, setFuncao] = useState('')
   const [area, setArea] = useState('')
   const [formacao, setFormacao] = useState('')
@@ -207,22 +206,20 @@ export default function Relatorios({ onEditSolicitacao }) {
       const nome = normalizar(servidor.nome)
       const funcaoRaw = normalizar(servidor.funcao)
       const funcaoNormalizada = normalizar(servidor.funcaoOficial)
-      const grupoNormalizado = normalizar(servidor.grupoFuncao)
       const formacaoNormalizada = normalizar(servidor.formacao)
       const areasNormalizadas = servidor.areasAtuacao.map(normalizar).join(' ')
       const escolasServidor = (Array.isArray(servidor.lotacoes) ? servidor.lotacoes : []).filter(lotacao => !lotacao?.data_fim)
       const nomeEscolaServidor = nomeEscolas(servidor).map(normalizar).join(' ')
-      const buscaOk = !termo || [nome, funcaoRaw, funcaoNormalizada, grupoNormalizado, formacaoNormalizada, areasNormalizadas, nomeEscolaServidor].some(texto => texto.includes(termo))
-      const grupoOk = !grupo || servidor.grupoFuncao === grupo
+      const buscaOk = !termo || [nome, funcaoRaw, funcaoNormalizada, normalizar(servidor.grupoFuncao), formacaoNormalizada, areasNormalizadas, nomeEscolaServidor].some(texto => texto.includes(termo))
       const funcaoOk = !funcao || servidor.funcaoOficial === funcao
       const areaOk = !area || servidor.areasAtuacao.includes(area)
       const formacaoOk = !formacao || formacaoNormalizada.includes(normalizar(formacao))
       const escolaOk = !escolaId || escolasServidor.some(lotacao => String(lotacao.escola_id) === escolaId)
       const statusOk = !status || servidor.status === status
       const vinculoOk = !vinculo || servidor.tipo_vinculo === vinculo
-      return buscaOk && grupoOk && funcaoOk && areaOk && formacaoOk && escolaOk && statusOk && vinculoOk
+      return buscaOk && funcaoOk && areaOk && formacaoOk && escolaOk && statusOk && vinculoOk
     })
-  }, [servidoresEnriquecidos, busca, grupo, funcao, area, formacao, escolaId, status, vinculo])
+  }, [servidoresEnriquecidos, busca, funcao, area, formacao, escolaId, status, vinculo])
 
   const cards = useMemo(() => {
     const contar = alvo => filtered.filter(servidor => servidor.funcaoOficial === alvo).length
@@ -253,7 +250,7 @@ export default function Relatorios({ onEditSolicitacao }) {
   }, [solicitacoes, buscaSolicitacao, statusSolicitacao, destinoSolicitacao, dataPedidoInicio, dataPedidoFim])
 
   function limparFiltrosServidores() {
-    setModelo('todos'); setBusca(''); setGrupo(''); setFuncao(''); setArea(''); setFormacao(''); setEscolaId(''); setStatus(''); setVinculo('')
+    setModelo('todos'); setBusca(''); setFuncao(''); setArea(''); setFormacao(''); setEscolaId(''); setStatus(''); setVinculo('')
   }
 
   function limparFiltrosSolicitacoes() {
@@ -262,19 +259,18 @@ export default function Relatorios({ onEditSolicitacao }) {
 
   function aplicarModelo(id) {
     setModelo(id); setBusca(''); setArea(''); setFormacao(''); setEscolaId(''); setStatus(''); setVinculo('')
-    if (id === 'professores') { setGrupo('Professores'); setFuncao('Professor') }
-    else if (id === 'merendeiras') { setGrupo('Apoio'); setFuncao('Merendeira') }
-    else if (id === 'serventes') { setGrupo('Apoio'); setFuncao('Servente') }
-    else if (id === 'atendentes') { setGrupo('Apoio'); setFuncao('Atendente de Creche') }
-    else if (id === 'secretaria') { setGrupo('Administrativo'); setFuncao('Secretaria / Administrativo') }
-    else if (id === 'portugues') { setGrupo('Professores'); setFuncao('Professor'); setArea('Língua Portuguesa') }
-    else if (id === 'matematica') { setGrupo('Professores'); setFuncao('Professor'); setArea('Matemática') }
-    else { setGrupo(''); setFuncao('') }
+    if (id === 'professores') { setFuncao('Professor') }
+    else if (id === 'merendeiras') { setFuncao('Merendeira') }
+    else if (id === 'serventes') { setFuncao('Servente') }
+    else if (id === 'atendentes') { setFuncao('Atendente de Creche') }
+    else if (id === 'secretaria') { setFuncao('Secretaria / Administrativo') }
+    else if (id === 'portugues') { setFuncao('Professor'); setArea('Língua Portuguesa') }
+    else if (id === 'matematica') { setFuncao('Professor'); setArea('Matemática') }
+    else { setFuncao('') }
   }
 
   function aplicarFuncaoRapida(valor) {
     setModelo('personalizado')
-    setGrupo(grupoDaFuncao(valor))
     setFuncao(valor)
   }
 
@@ -329,7 +325,7 @@ export default function Relatorios({ onEditSolicitacao }) {
     imprimirTabela({ titulo: 'Pedidos de transferência', colunas: ['Servidor', 'Origem', 'Destino', 'Data do pedido', 'Status', 'Atendimento', 'Observações'], linhas, resumo: 'Relatório administrativo de pedidos de transferência. Os pedidos não alteram lotações automaticamente.' })
   }
 
-  const filtrosServidorAtivos = [busca, grupo, funcao, area, formacao, escolaId, status, vinculo].filter(Boolean).length
+  const filtrosServidorAtivos = [busca, funcao, area, formacao, escolaId, status, vinculo].filter(Boolean).length
   const filtrosSolicitacaoAtivos = [buscaSolicitacao, statusSolicitacao, destinoSolicitacao, dataPedidoInicio, dataPedidoFim].filter(Boolean).length
   const emPedidos = tipoRelatorio === 'solicitacoes'
   const loadingAtual = emPedidos ? loadingSolicitacoes : loading
@@ -394,7 +390,6 @@ export default function Relatorios({ onEditSolicitacao }) {
             {mostrarFiltros && <div className="p-4 border-t border-slate-100 space-y-3">
               <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5"><Search size={15} className="text-slate-400 shrink-0" /><input type="search" name="busca-relatorios" autoComplete="off" spellCheck="false" data-form-type="other" data-lpignore="true" aria-label="Buscar no relatório" className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-slate-400" placeholder="Buscar por nome, função, área, formação ou escola..." value={busca} onChange={event => alterarFiltro(setBusca, event.target.value)} />{busca && <button onClick={() => alterarFiltro(setBusca, '')} className="p-1 rounded-lg hover:bg-slate-200"><X size={14} className="text-slate-400" /></button>}</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Grupo de função</span><select value={grupo} onChange={event => alterarFiltro(setGrupo, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todos os grupos</option>{GRUPOS_FUNCAO.map(item => <option key={item}>{item}</option>)}</select></label>
                 <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Função</span><select value={funcao} onChange={event => alterarFiltro(setFuncao, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todas as funções</option>{GRUPOS_FUNCAO.map(grupoItem => { const itens = funcoes.filter(item => grupoDaFuncao(item) === grupoItem); return itens.length ? <optgroup key={grupoItem} label={grupoItem}>{itens.map(item => <option key={item} value={item}>{item}</option>)}</optgroup> : null })}</select></label>
                 <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Área de atuação</span><select value={area} onChange={event => alterarFiltro(setArea, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todas as áreas</option>{areas.map(item => <option key={item}>{item}</option>)}</select></label>
                 <label className="block"><span className="block text-xs font-semibold text-slate-500 mb-1.5">Formação</span><select value={formacao} onChange={event => alterarFiltro(setFormacao, event.target.value)} className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 outline-none"><option value="">Todas as formações</option>{formacoes.map(item => <option key={item}>{item}</option>)}</select></label>
