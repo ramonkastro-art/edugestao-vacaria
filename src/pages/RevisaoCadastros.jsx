@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   AlertCircle, AlertTriangle, CheckCircle2, Edit2, Filter,
-  RefreshCw, Search, Users, X, School, GraduationCap,
+  Info, RefreshCw, Search, Users, X, School, Eye,
 } from 'lucide-react'
 import { classificarFuncao, normalizar } from '../lib/semantic'
 
@@ -24,44 +24,66 @@ function escolaNomes(servidor) {
   return [...new Set(nomes)]
 }
 
+function motivosFuncao(funcao) {
+  const norm = normalizado(funcao)
+  const motivos = []
+  if (TURMA_RE.test(norm)) motivos.push('turma')
+  if (HORARIO_RE.test(norm)) motivos.push('horário')
+  if (ATELIE_RE.test(norm)) motivos.push('atividade/ateliê')
+  if (AREA_RE.test(norm)) motivos.push('Área I/II')
+  if (DISCIPLINA_RE.test(norm)) motivos.push('disciplina/área')
+  if (LONG_NON_FUNCTION_RE.test(norm)) motivos.push('dados de outro campo')
+  return motivos
+}
+
 function analisarServidor(servidor) {
   const funcao = String(servidor?.funcao ?? '').trim()
   const funcaoOriginal = String(servidor?.funcao_original ?? '').trim()
   const formacao = String(servidor?.formacao ?? '').trim()
   const fontes = [funcao, funcaoOriginal].filter(Boolean).join(' | ')
-  const norm = normalizado(fontes)
+  const motivos = motivosFuncao(fontes)
   const classificacao = classificarFuncao(servidor)
   const problemas = []
+  const informativos = []
 
   if (!funcao && !funcaoOriginal) {
-    problemas.push({ tipo: 'Sem função', severidade: 'alta', detalhe: 'O cadastro não possui função informada.' })
+    problemas.push({
+      tipo: 'Sem função',
+      severidade: 'alta',
+      detalhe: 'A função não foi informada. Esta é uma correção prioritária porque impede uma classificação administrativa confiável.',
+    })
   }
 
-  if (norm && (TURMA_RE.test(norm) || HORARIO_RE.test(norm) || ATELIE_RE.test(norm) || AREA_RE.test(norm) || DISCIPLINA_RE.test(norm) || LONG_NON_FUNCTION_RE.test(norm))) {
+  if (fontes && motivos.length > 0) {
     problemas.push({
-      tipo: 'Função possivelmente deslocada',
+      tipo: 'Função possivelmente preenchida em campo incorreto',
       severidade: 'alta',
-      detalhe: 'O campo função parece conter turma, horário, disciplina ou texto de outro campo.',
+      detalhe: `O valor informado parece conter ${motivos.join(', ')} em vez de apenas uma função.`,
+      evidencia: fontes,
     })
   }
 
   if (!formacao) {
-    problemas.push({ tipo: 'Sem formação', severidade: 'média', detalhe: 'Formação não informada.' })
-  }
-
-  if (classificacao === 'Professor' && (!norm || !/professor|professora|docent/i.test(norm))) {
-    problemas.push({
-      tipo: 'Professor inferido',
-      severidade: 'média',
-      detalhe: 'A classificação semântica identificou possível docência a partir de turma, área ou formação.',
+    informativos.push({
+      tipo: 'Formação profissional não informada',
+      severidade: 'informativa',
+      detalhe: 'Isto não é considerado erro por si só. Muitos cargos podem não exigir uma formação profissional específica. O cadastro pode ser completado posteriormente.',
     })
   }
 
-  if (classificacao === 'Atendente de Creche' && !/atendente|cuidador|auxiliar de desenvolvimento infantil|auxiliar maternal/i.test(norm)) {
-    problemas.push({
-      tipo: 'Atendente inferido',
-      severidade: 'média',
-      detalhe: 'A classificação semântica encontrou indícios de atuação como atendente/apoio infantil.',
+  if (classificacao === 'Professor' && (!normalizado(fontes) || !/professor|professora|docent/i.test(normalizado(fontes)))) {
+    informativos.push({
+      tipo: 'Classificação sugerida: Professor',
+      severidade: 'informativa',
+      detalhe: 'O sistema encontrou indícios de docência em turma, área ou formação. Confirme antes de transformar a sugestão em dado oficial.',
+    })
+  }
+
+  if (classificacao === 'Atendente de Creche' && !/atendente|cuidador|auxiliar de desenvolvimento infantil|auxiliar maternal/i.test(normalizado(fontes))) {
+    informativos.push({
+      tipo: 'Classificação sugerida: Atendente de Creche',
+      severidade: 'informativa',
+      detalhe: 'O sistema encontrou indícios de atuação como atendente/apoio infantil. Confirme antes de transformar a sugestão em dado oficial.',
     })
   }
 
@@ -70,14 +92,14 @@ function analisarServidor(servidor) {
     classificacao,
     escolas: escolaNomes(servidor),
     problemas,
-    prioridade: problemas.some(p => p.severidade === 'alta') ? 'alta' : problemas.length ? 'média' : 'ok',
+    informativos,
+    prioridade: problemas.some(p => p.severidade === 'alta') ? 'alta' : 'ok',
   }
 }
 
 function prioridadeLabel(prioridade) {
-  if (prioridade === 'alta') return { label: 'Corrigir', className: 'bg-red-50 text-red-700 border-red-200' }
-  if (prioridade === 'média') return { label: 'Revisar', className: 'bg-amber-50 text-amber-700 border-amber-200' }
-  return { label: 'OK', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+  if (prioridade === 'alta') return { label: 'Corrigir / revisar', className: 'bg-red-50 text-red-700 border-red-200' }
+  return { label: 'Sem correção apontada', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
 }
 
 export default function RevisaoCadastros({ servidores = [], escolas = [], onEditServidor, canEdit = false, refreshToken = 0 }) {
@@ -85,39 +107,48 @@ export default function RevisaoCadastros({ servidores = [], escolas = [], onEdit
   const [escolaFiltro, setEscolaFiltro] = useState('')
   const [tipoFiltro, setTipoFiltro] = useState('')
   const [statusFiltro, setStatusFiltro] = useState('')
-  const [mostrarOk, setMostrarOk] = useState(false)
+  const [escopoFiltro, setEscopoFiltro] = useState('correcoes')
 
   const analisados = useMemo(() => servidores.map(analisarServidor), [servidores, refreshToken])
 
-  const pendencias = useMemo(() => analisados.filter(item => item.problemas.length > 0), [analisados])
-  const altas = useMemo(() => pendencias.filter(item => item.prioridade === 'alta'), [pendencias])
-  const semFuncao = useMemo(() => pendencias.filter(item => item.problemas.some(p => p.tipo === 'Sem função')).length, [pendencias])
-  const funcaoDeslocada = useMemo(() => pendencias.filter(item => item.problemas.some(p => p.tipo === 'Função possivelmente deslocada')).length, [pendencias])
-  const semFormacao = useMemo(() => pendencias.filter(item => item.problemas.some(p => p.tipo === 'Sem formação')).length, [pendencias])
+  const correcoes = useMemo(() => analisados.filter(item => item.problemas.length > 0), [analisados])
+  const altas = useMemo(() => correcoes.filter(item => item.prioridade === 'alta'), [correcoes])
+  const semFuncao = useMemo(() => correcoes.filter(item => item.problemas.some(p => p.tipo === 'Sem função')).length, [correcoes])
+  const funcaoDeslocada = useMemo(() => correcoes.filter(item => item.problemas.some(p => p.tipo === 'Função possivelmente preenchida em campo incorreto')).length, [correcoes])
+  const formacaoNaoInformada = useMemo(() => analisados.filter(item => item.informativos.some(p => p.tipo === 'Formação profissional não informada')).length, [analisados])
+  const classificacoesSugeridas = useMemo(() => analisados.filter(item => item.informativos.some(p => p.tipo.startsWith('Classificação sugerida'))).length, [analisados])
 
   const filtrados = useMemo(() => {
     const termo = normalizado(busca)
-    return (mostrarOk ? analisados : pendencias).filter(item => {
+    let base = analisados
+    if (escopoFiltro === 'correcoes') base = correcoes
+    if (escopoFiltro === 'informativos') base = analisados.filter(item => item.informativos.length > 0)
+
+    return base.filter(item => {
       if (statusFiltro && String(item.servidor?.status ?? '') !== statusFiltro) return false
       if (escolaFiltro && !item.servidor?.lotacoes?.some(l => !l?.data_fim && String(l?.escola_id) === String(escolaFiltro))) return false
-      if (tipoFiltro && !item.problemas.some(p => p.tipo === tipoFiltro)) return false
+      if (tipoFiltro && !item.problemas.some(p => p.tipo === tipoFiltro) && !item.informativos.some(p => p.tipo === tipoFiltro)) return false
       if (!termo) return true
       const haystack = normalizado([
         item.servidor?.nome,
         item.servidor?.funcao,
         item.servidor?.funcao_original,
         item.servidor?.formacao,
+        item.classificacao,
         ...item.escolas,
       ].filter(Boolean).join(' | '))
       return haystack.includes(termo)
     })
-  }, [analisados, pendencias, mostrarOk, busca, escolaFiltro, tipoFiltro, statusFiltro])
+  }, [analisados, correcoes, escopoFiltro, busca, escolaFiltro, tipoFiltro, statusFiltro])
 
   const tipoOpcoes = useMemo(() => {
     const set = new Set()
-    pendencias.forEach(item => item.problemas.forEach(p => set.add(p.tipo)))
-    return [...set].sort()
-  }, [pendencias])
+    analisados.forEach(item => {
+      item.problemas.forEach(p => set.add(p.tipo))
+      item.informativos.forEach(p => set.add(p.tipo))
+    })
+    return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [analisados])
 
   function limpar() {
     setBusca('')
@@ -135,8 +166,8 @@ export default function RevisaoCadastros({ servidores = [], escolas = [], onEdit
               <AlertTriangle size={18} className="text-amber-600" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-slate-800">Cadastros a corrigir</h1>
-              <p className="text-sm text-slate-400">Revisão inteligente dos 1.186 cadastros, preservando os dados originais.</p>
+              <h1 className="text-xl font-semibold text-slate-800">Revisão de cadastros</h1>
+              <p className="text-sm text-slate-400">O sistema aponta evidências para revisão; ele não declara que um cadastro está errado automaticamente.</p>
             </div>
           </div>
         </div>
@@ -147,33 +178,41 @@ export default function RevisaoCadastros({ servidores = [], escolas = [], onEdit
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-white border border-slate-100 rounded-2xl p-4">
-          <div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Com pendências</span><AlertTriangle size={17} className="text-amber-500" /></div>
-          <p className="text-3xl font-semibold text-slate-800 mt-2">{pendencias.length}</p>
-          <p className="text-xs text-slate-400 mt-1">{altas.length} exigem correção prioritária</p>
+          <div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Para corrigir / revisar</span><AlertTriangle size={17} className="text-amber-500" /></div>
+          <p className="text-3xl font-semibold text-slate-800 mt-2">{altas.length}</p>
+          <p className="text-xs text-slate-400 mt-1">Somente problemas acionáveis</p>
         </div>
         <div className="bg-white border border-slate-100 rounded-2xl p-4">
           <div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sem função</span><AlertCircle size={17} className="text-red-500" /></div>
           <p className="text-3xl font-semibold text-slate-800 mt-2">{semFuncao}</p>
-          <p className="text-xs text-slate-400 mt-1">Campo obrigatório para gestão</p>
+          <p className="text-xs text-slate-400 mt-1">Correção prioritária</p>
         </div>
         <div className="bg-white border border-slate-100 rounded-2xl p-4">
-          <div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Função deslocada</span><Filter size={17} className="text-red-500" /></div>
+          <div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Revisar função</span><Eye size={17} className="text-red-500" /></div>
           <p className="text-3xl font-semibold text-slate-800 mt-2">{funcaoDeslocada}</p>
-          <p className="text-xs text-slate-400 mt-1">Turma, horário, área ou disciplina</p>
+          <p className="text-xs text-slate-400 mt-1">Suspeita baseada no conteúdo do campo</p>
         </div>
         <div className="bg-white border border-slate-100 rounded-2xl p-4">
-          <div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sem formação</span><GraduationCap size={17} className="text-amber-500" /></div>
-          <p className="text-3xl font-semibold text-slate-800 mt-2">{semFormacao}</p>
-          <p className="text-xs text-slate-400 mt-1">Pendência informativa</p>
+          <div className="flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Informação faltante</span><Info size={17} className="text-sky-500" /></div>
+          <p className="text-3xl font-semibold text-slate-800 mt-2">{formacaoNaoInformada}</p>
+          <p className="text-xs text-slate-400 mt-1">Formação profissional não informada — não é erro automático</p>
+        </div>
+      </div>
+
+      <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4 text-sm text-sky-900">
+        <div className="flex items-start gap-2">
+          <Info size={16} className="mt-0.5 shrink-0 text-sky-600" />
+          <div>
+            <p className="font-semibold">Como interpretar esta tela</p>
+            <p className="text-xs mt-1 text-sky-800">“Sem função” é uma correção objetiva. “Revisar função” é uma suspeita baseada no conteúdo do campo. Já a ausência de formação profissional é apenas informativa: ela não significa que o servidor esteja irregular. O sistema também pode sugerir uma função, mas a decisão final continua sendo humana.</p>
+          </div>
         </div>
       </div>
 
       <div className="bg-white border border-slate-100 rounded-2xl p-4">
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><Filter size={15} /> Filtros de revisão</div>
-          <label className="ml-auto inline-flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
-            <input type="checkbox" checked={mostrarOk} onChange={e => setMostrarOk(e.target.checked)} /> Mostrar cadastros sem pendências
-          </label>
+          <span className="ml-auto text-xs text-slate-400">{classificacoesSugeridas} classificação(ões) automática(s) sugerida(s)</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="md:col-span-2 flex items-center gap-2 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl">
@@ -181,42 +220,47 @@ export default function RevisaoCadastros({ servidores = [], escolas = [], onEdit
             <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar nome, função, formação ou escola..." className="flex-1 bg-transparent outline-none text-sm text-slate-700" />
             {busca && <button onClick={() => setBusca('')}><X size={14} className="text-slate-400" /></button>}
           </div>
+          <select value={escopoFiltro} onChange={e => setEscopoFiltro(e.target.value)} className="px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 outline-none">
+            <option value="correcoes">Somente correções / suspeitas</option>
+            <option value="informativos">Informações faltantes / sugestões</option>
+            <option value="todos">Todos os cadastros</option>
+          </select>
           <select value={escolaFiltro} onChange={e => setEscolaFiltro(e.target.value)} className="px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 outline-none">
             <option value="">Todas as escolas</option>
             {escolas.filter(e => e.tipo !== 'SMED').map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
-          <select value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value)} className="px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 outline-none">
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <select value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 outline-none">
             <option value="">Todos os tipos</option>
             {tipoOpcoes.map(tipo => <option key={tipo}>{tipo}</option>)}
           </select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 mt-3">
           <select value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 outline-none">
             <option value="">Todos os status</option><option>Ativo</option><option>Afastado</option><option>Inativo</option>
           </select>
-          {(busca || escolaFiltro || tipoFiltro || statusFiltro) && <button onClick={limpar} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"><X size={13} /> Limpar filtros</button>}
+          {(busca || escolaFiltro || tipoFiltro || statusFiltro || escopoFiltro !== 'correcoes') && <button onClick={() => { limpar(); setEscopoFiltro('correcoes') }} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"><X size={13} /> Limpar filtros</button>}
         </div>
       </div>
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500"><strong className="text-slate-800">{filtrados.length}</strong> cadastro(s) no recorte</p>
-        <p className="text-xs text-slate-400">A classificação é uma sugestão de revisão; não sobrescreve o dado original.</p>
+        <p className="text-xs text-slate-400">As sugestões não sobrescrevem os dados originais.</p>
       </div>
 
       {filtrados.length === 0 ? (
         <div className="bg-white border border-slate-100 rounded-2xl p-12 text-center text-slate-400">
           <CheckCircle2 size={34} className="mx-auto mb-3 text-emerald-400" />
-          <p className="font-medium text-slate-600">Nenhum cadastro encontrado neste recorte.</p>
-          <p className="text-sm mt-1">Isso não significa que o cadastro esteja perfeito; significa apenas que nenhum dos critérios atuais foi acionado.</p>
+          <p className="font-medium text-slate-600">Nenhuma revisão encontrada neste recorte.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filtrados.map(item => {
             const prioridade = prioridadeLabel(item.prioridade)
             const problemasVisiveis = item.problemas.slice(0, 3)
+            const informativosVisiveis = item.informativos.slice(0, 2)
             return (
               <div key={item.servidor.id} className="bg-white border border-slate-100 rounded-2xl p-4 hover:border-slate-200 transition-colors">
-                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                   <div className="flex items-start gap-3 min-w-0 flex-1">
                     <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"><Users size={17} className="text-slate-500" /></div>
                     <div className="min-w-0">
@@ -231,22 +275,32 @@ export default function RevisaoCadastros({ servidores = [], escolas = [], onEdit
                     </div>
                   </div>
 
-                  <div className="lg:w-[38%] text-sm">
-                    <div className="text-[11px] uppercase tracking-wide font-semibold text-slate-400">Função informada</div>
+                  <div className="lg:w-[28%] text-sm">
+                    <div className="text-[11px] uppercase tracking-wide font-semibold text-slate-400">Valor informado</div>
                     <div className="mt-1 text-slate-700 break-words">{item.servidor.funcao || item.servidor.funcao_original || <span className="text-red-500">Não informada</span>}</div>
-                    <div className="text-xs text-slate-400 mt-1">Sugestão semântica: <strong className="text-slate-600">{item.classificacao}</strong></div>
+                    <div className="text-xs text-slate-400 mt-1">Classificação sugerida: <strong className="text-slate-600">{item.classificacao || 'Não classificado'}</strong></div>
                   </div>
 
-                  <div className="lg:w-[30%]">
-                    <div className="text-[11px] uppercase tracking-wide font-semibold text-slate-400">O que revisar</div>
-                    <div className="mt-1 space-y-1">
-                      {problemasVisiveis.map(p => <div key={p.tipo} className="text-xs text-slate-600"><span className="font-semibold">{p.tipo}:</span> {p.detalhe}</div>)}
+                  <div className="lg:w-[34%]">
+                    <div className="text-[11px] uppercase tracking-wide font-semibold text-slate-400">Por que o sistema chamou atenção</div>
+                    <div className="mt-1 space-y-2">
+                      {problemasVisiveis.map(p => (
+                        <div key={p.tipo} className="text-xs text-slate-600">
+                          <div><span className="font-semibold text-red-700">{p.tipo}:</span> {p.detalhe}</div>
+                          {p.evidencia && <div className="mt-1 rounded-lg bg-slate-50 border border-slate-100 p-2 text-[11px] text-slate-500">Evidência: <span className="font-medium text-slate-600">{p.evidencia}</span></div>}
+                        </div>
+                      ))}
+                      {problemasVisiveis.length === 0 && informativosVisiveis.map(p => (
+                        <div key={p.tipo} className="text-xs text-slate-600">
+                          <span className="font-semibold text-sky-700">{p.tipo}:</span> {p.detalhe}
+                        </div>
+                      ))}
                     </div>
                   </div>
 
                   {canEdit && onEditServidor && (
                     <button onClick={() => onEditServidor(item.servidor)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 shrink-0">
-                      <Edit2 size={13} /> Corrigir cadastro
+                      <Edit2 size={13} /> Abrir cadastro
                     </button>
                   )}
                 </div>
