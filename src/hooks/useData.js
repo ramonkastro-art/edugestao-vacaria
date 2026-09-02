@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 const SERVIDORES_SELECT = `
   id, nome, nome_norm, status, funcao, tipo_vinculo, cpf,
   matricula, email, telefone, data_nascimento,
-  endereco, formacao, regencia_h, htp_h, hti_h, observacoes,
+  endereco, formacao, formacao_original, funcao_original, dados_fonte, regencia_h, htp_h, hti_h, observacoes,
   lotacoes ( id, escola_id, principal, data_inicio, data_fim, motivo_saida, funcao_original, funcao_categoria, turno_original, area_concurso_original, area_atuacao_categoria, turma_atuacao, vinculo_original, matricula_original, escola:escolas(id, name, tipo) )
 `
 
@@ -18,7 +18,7 @@ const SERVIDORES_SELECT_COMPATIVEL = `
 const SERVIDORES_POR_ESCOLA_SELECT = `
   escola_id, principal,
   servidor:servidores (
-    id, nome, status, funcao, tipo_vinculo, cpf, matricula,
+    id, nome, status, funcao, formacao, formacao_original, funcao_original, tipo_vinculo, cpf, matricula,
     lotacoes ( id, escola_id, principal, data_inicio, data_fim, motivo_saida, funcao_original, funcao_categoria, turno_original, area_concurso_original, area_atuacao_categoria, turma_atuacao, vinculo_original, matricula_original, escola:escolas(id, name, tipo) )
   )
 `
