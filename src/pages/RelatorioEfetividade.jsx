@@ -137,17 +137,22 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
   }
 
   return (
-    <div className="space-y-5 print:space-y-0">
+    <div className="print-report space-y-5 print:space-y-0">
       <style>{`
         @media print {
           @page {
             size: A4 landscape;
-            margin: 8mm;
+            margin: 5mm;
           }
 
-          html, body {
+          html,
+          body {
             background: #fff !important;
             color: #0f172a !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            min-width: 0 !important;
             font-size: 9px !important;
           }
 
@@ -156,64 +161,127 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
             print-color-adjust: exact;
           }
 
-          .no-print { display: none !important; }
-          .print-card { box-shadow: none !important; border-color: #dbe4ea !important; }
-          .print-compact-header { padding: 8px 10px !important; }
-          .print-summary { display: flex !important; }
-          .screen-summary { display: none !important; }
+          /* Remove o shell do aplicativo: deixa a folha dedicada ao relatório. */
+          body header,
+          body nav,
+          .no-print {
+            display: none !important;
+          }
+
+          .print-report {
+            display: block !important;
+            width: 100vw !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          .print-card {
+            width: 100% !important;
+            max-width: none !important;
+            box-shadow: none !important;
+            border-color: #dbe4ea !important;
+            border-radius: 8px !important;
+          }
+
+          .print-compact-header {
+            padding: 7px 9px !important;
+            margin-bottom: 5px !important;
+          }
+
+          .print-compact-header h2 {
+            font-size: 16px !important;
+            line-height: 1.1 !important;
+            margin-top: 2px !important;
+          }
+
+          .print-compact-header p {
+            font-size: 8.5px !important;
+            line-height: 1.15 !important;
+          }
+
+          .print-summary {
+            display: flex !important;
+            width: 100% !important;
+          }
+
+          .screen-summary {
+            display: none !important;
+          }
 
           .print-table-wrap {
             overflow: visible !important;
+            width: 100% !important;
+            max-width: none !important;
           }
 
           .print-table {
             width: 100% !important;
+            max-width: none !important;
             min-width: 0 !important;
             table-layout: fixed !important;
             border-collapse: collapse !important;
           }
 
-          .print-table thead tr {
-            page-break-inside: avoid;
+          .print-table thead {
+            display: table-header-group !important;
+          }
+
+          .print-table tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
 
           .print-table th,
           .print-table td {
-            padding: 3px 5px !important;
+            padding: 2.5px 4px !important;
             font-size: 8.5px !important;
-            line-height: 1.18 !important;
+            line-height: 1.12 !important;
             vertical-align: top !important;
+            word-break: normal !important;
+            overflow-wrap: anywhere !important;
           }
 
           .print-table th {
-            font-size: 7.5px !important;
-            letter-spacing: .04em !important;
+            padding-top: 3px !important;
+            padding-bottom: 3px !important;
+            font-size: 7.2px !important;
+            line-height: 1.05 !important;
+            letter-spacing: .035em !important;
           }
 
           .print-table td:nth-child(1),
-          .print-table th:nth-child(1) { width: 18%; }
+          .print-table th:nth-child(1) { width: 17%; }
+
           .print-table td:nth-child(2),
-          .print-table th:nth-child(2) { width: 23%; }
+          .print-table th:nth-child(2) { width: 22%; }
+
           .print-table td:nth-child(3),
           .print-table th:nth-child(3) { width: 10%; }
+
           .print-table td:nth-child(4),
           .print-table th:nth-child(4) { width: 12%; }
+
           .print-table td:nth-child(5),
           .print-table th:nth-child(5) { width: 5%; }
+
           .print-table td:nth-child(6),
-          .print-table th:nth-child(6) { width: 18%; }
+          .print-table th:nth-child(6) { width: 19%; }
+
           .print-table td:nth-child(7),
-          .print-table th:nth-child(7) { width: 14%; }
+          .print-table th:nth-child(7) { width: 15%; }
 
           .print-status {
-            padding: 2px 5px !important;
-            font-size: 7.5px !important;
-            line-height: 1.1 !important;
+            padding: 1.5px 4px !important;
+            font-size: 7px !important;
+            line-height: 1 !important;
+            white-space: nowrap !important;
           }
 
           .print-footer {
-            margin-top: 5px !important;
-            font-size: 7.5px !important;
+            margin-top: 4px !important;
+            font-size: 7px !important;
           }
         }
 
