@@ -7,7 +7,7 @@ import { useEscolas, useServidoresByEscola, useEfetividade } from '../hooks/useD
 
 const OCORRENCIA_LEGADA = {
   Falta: 'Falta sem atestado',
-  'Outro': 'Outro motivo de ausência',
+  Outro: 'Outro motivo de ausência',
 }
 
 function rotuloOcorrencia(valor) {
@@ -71,7 +71,7 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
       .filter(({ registro }) => {
         if (filtro === 'ok') return registro?.status === 'ok'
         if (filtro === 'ocorrencia') return registro?.status === 'ocorrencia'
-        if (filtro === 'pendente') return !registro || registro.status !== 'ok' && registro.status !== 'ocorrencia'
+        if (filtro === 'pendente') return !registro || (registro.status !== 'ok' && registro.status !== 'ocorrencia')
         return true
       })
       .sort((a, b) => a.servidor.nome.localeCompare(b.servidor.nome, 'pt-BR'))
@@ -137,8 +137,90 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
   }
 
   return (
-    <div className="space-y-5 print:space-y-3">
-      <style>{`@media print { body { background: white !important; } .no-print { display: none !important; } .print-card { box-shadow: none !important; border-color: #e2e8f0 !important; } table { font-size: 10px; } }`}</style>
+    <div className="space-y-5 print:space-y-0">
+      <style>{`
+        @media print {
+          @page {
+            size: A4 landscape;
+            margin: 8mm;
+          }
+
+          html, body {
+            background: #fff !important;
+            color: #0f172a !important;
+            font-size: 9px !important;
+          }
+
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          .no-print { display: none !important; }
+          .print-card { box-shadow: none !important; border-color: #dbe4ea !important; }
+          .print-compact-header { padding: 8px 10px !important; }
+          .print-summary { display: flex !important; }
+          .screen-summary { display: none !important; }
+
+          .print-table-wrap {
+            overflow: visible !important;
+          }
+
+          .print-table {
+            width: 100% !important;
+            min-width: 0 !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+          }
+
+          .print-table thead tr {
+            page-break-inside: avoid;
+          }
+
+          .print-table th,
+          .print-table td {
+            padding: 3px 5px !important;
+            font-size: 8.5px !important;
+            line-height: 1.18 !important;
+            vertical-align: top !important;
+          }
+
+          .print-table th {
+            font-size: 7.5px !important;
+            letter-spacing: .04em !important;
+          }
+
+          .print-table td:nth-child(1),
+          .print-table th:nth-child(1) { width: 18%; }
+          .print-table td:nth-child(2),
+          .print-table th:nth-child(2) { width: 23%; }
+          .print-table td:nth-child(3),
+          .print-table th:nth-child(3) { width: 10%; }
+          .print-table td:nth-child(4),
+          .print-table th:nth-child(4) { width: 12%; }
+          .print-table td:nth-child(5),
+          .print-table th:nth-child(5) { width: 5%; }
+          .print-table td:nth-child(6),
+          .print-table th:nth-child(6) { width: 18%; }
+          .print-table td:nth-child(7),
+          .print-table th:nth-child(7) { width: 14%; }
+
+          .print-status {
+            padding: 2px 5px !important;
+            font-size: 7.5px !important;
+            line-height: 1.1 !important;
+          }
+
+          .print-footer {
+            margin-top: 5px !important;
+            font-size: 7.5px !important;
+          }
+        }
+
+        @media screen {
+          .print-summary { display: none; }
+        }
+      `}</style>
 
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 no-print">
         <div>
@@ -175,15 +257,15 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
         </label>
       </div>
 
-      {erro && <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-sm text-red-700"><p className="font-semibold">Não foi possível carregar todos os dados.</p><p className="text-xs mt-1 break-words">{erro}</p></div>}
+      {erro && <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-sm text-red-700 no-print"><p className="font-semibold">Não foi possível carregar todos os dados.</p><p className="text-xs mt-1 break-words">{erro}</p></div>}
 
       {!escolaId ? (
-        <div className="p-8 bg-[#fff3df] border border-[#f8d6a5] rounded-2xl text-sm text-[#8f4d0b]"><p className="font-semibold">Selecione uma escola para gerar o relatório.</p></div>
+        <div className="p-8 bg-[#fff3df] border border-[#f8d6a5] rounded-2xl text-sm text-[#8f4d0b] no-print"><p className="font-semibold">Selecione uma escola para gerar o relatório.</p></div>
       ) : loadingServidores ? (
-        <div className="flex items-center justify-center py-20"><Loader2 size={28} className="animate-spin text-slate-400" /></div>
+        <div className="flex items-center justify-center py-20 no-print"><Loader2 size={28} className="animate-spin text-slate-400" /></div>
       ) : (
         <>
-          <div className="print-card bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <div className="print-card print-compact-header bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">EduGestão Vacaria</p>
@@ -197,13 +279,23 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div className="screen-summary grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
             <div className="brand-card-blue rounded-2xl p-4"><Users size={16} className="text-[#0f789c] mb-2" /><p className="text-2xl font-semibold text-[#0b5e7d]">{indicadores.total}</p><p className="text-xs text-slate-500 mt-0.5">Servidores</p></div>
             <div className="brand-card-green rounded-2xl p-4"><CheckCircle2 size={16} className="text-[#3c9c5a] mb-2" /><p className="text-2xl font-semibold text-[#287346]">{indicadores.tudoOk}</p><p className="text-xs text-slate-500 mt-0.5">Tudo OK</p></div>
             <div className="brand-card-orange rounded-2xl p-4"><AlertCircle size={16} className="text-[#d96f0d] mb-2" /><p className="text-2xl font-semibold text-[#9a4f08]">{indicadores.atestados}</p><p className="text-xs text-slate-500 mt-0.5">Atestados</p></div>
             <div className="brand-card-orange rounded-2xl p-4"><FileText size={16} className="text-[#d96f0d] mb-2" /><p className="text-2xl font-semibold text-[#9a4f08]">{indicadores.licencas}</p><p className="text-xs text-slate-500 mt-0.5">Licenças</p></div>
             <div className="brand-card-neutral rounded-2xl p-4"><Users size={16} className="text-[#0f789c] mb-2" /><p className="text-2xl font-semibold text-[#20234f]">{indicadores.dias}</p><p className="text-xs text-slate-500 mt-0.5">Dias de ausência</p></div>
             <div className="brand-card-neutral rounded-2xl p-4"><AlertCircle size={16} className="text-[#0f789c] mb-2" /><p className="text-2xl font-semibold text-[#20234f]">{indicadores.pendentes}</p><p className="text-xs text-slate-500 mt-0.5">Pendentes</p></div>
+          </div>
+
+          <div className="print-summary items-center justify-between gap-3 border-b border-slate-200 pb-2 mb-2 text-[8px] text-slate-700">
+            <span><strong>{indicadores.total}</strong> servidores</span>
+            <span><strong>{indicadores.tudoOk}</strong> OK</span>
+            <span><strong>{indicadores.atestados}</strong> atestados</span>
+            <span><strong>{indicadores.licencas}</strong> licenças</span>
+            <span><strong>{indicadores.dias}</strong> dias de ausência</span>
+            <span><strong>{indicadores.pendentes}</strong> pendentes</span>
+            <span><strong>{indicadores.percentualConcluido}%</strong> concluído</span>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 no-print">
@@ -217,8 +309,8 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
           </div>
 
           <div className="print-card bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
+            <div className="print-table-wrap overflow-x-auto">
+              <table className="print-table w-full min-w-[900px]">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
                     <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400">Servidor</th>
@@ -235,7 +327,7 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
                     <tr key={servidor.id} className="hover:bg-slate-50/70">
                       <td className="px-4 py-3 text-sm font-semibold text-slate-800">{servidor.nome}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{nomeFuncao(servidor)}</td>
-                      <td className="px-4 py-3"><span className={`inline-flex items-center px-2 py-1 rounded-full border text-[10px] font-semibold ${statusClass(registro)}`}>{statusLabel(registro)}</span></td>
+                      <td className="px-4 py-3"><span className={`print-status inline-flex items-center px-2 py-1 rounded-full border text-[10px] font-semibold ${statusClass(registro)}`}>{statusLabel(registro)}</span></td>
                       <td className="px-4 py-3 text-sm text-slate-600">{registro?.status === 'ocorrencia' ? rotuloOcorrencia(registro.ocorrencia) : '—'}</td>
                       <td className="px-4 py-3 text-sm text-center font-semibold text-slate-700">{registro?.dias_ausencia ?? '—'}</td>
                       <td className="px-4 py-3 text-sm text-slate-600">{registro?.detalhes_ocorrencia || '—'}</td>
@@ -248,7 +340,8 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
             </div>
           </div>
 
-          <p className="text-[11px] text-slate-400 no-print">O relatório considera os servidores ativos apresentados no quadro da unidade e os lançamentos da competência selecionada.</p>
+          <p className="print-footer text-[11px] text-slate-400 no-print">O relatório considera os servidores ativos apresentados no quadro da unidade e os lançamentos da competência selecionada.</p>
+          <p className="print-footer hidden print:block text-[7.5px] text-slate-400 mt-2">Relatório gerado pelo EduGestão Vacaria · {new Date().toLocaleString('pt-BR')}</p>
         </>
       )}
     </div>
