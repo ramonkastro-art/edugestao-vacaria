@@ -142,18 +142,21 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
         @media print {
           @page {
             size: A4 landscape;
-            margin: 5mm;
+            margin: 4mm;
           }
 
           html,
-          body {
-            background: #fff !important;
-            color: #0f172a !important;
+          body,
+          #root {
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
-            width: 100% !important;
-            min-width: 0 !important;
+            background: #fff !important;
+            color: #0f172a !important;
             font-size: 9px !important;
+            overflow: visible !important;
           }
 
           body {
@@ -161,49 +164,75 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
             print-color-adjust: exact;
           }
 
-          /* Remove o shell do aplicativo: deixa a folha dedicada ao relatório. */
+          /* Libera o conteúdo do relatório da largura máxima do shell. */
           body header,
           body nav,
           .no-print {
             display: none !important;
           }
 
+          main {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+          }
+
           .print-report {
             display: block !important;
-            width: 100vw !important;
+            position: relative !important;
+            width: 100% !important;
             max-width: none !important;
             min-width: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
+            overflow: visible !important;
           }
 
           .print-card {
             width: 100% !important;
             max-width: none !important;
+            margin: 0 0 4px 0 !important;
             box-shadow: none !important;
             border-color: #dbe4ea !important;
-            border-radius: 8px !important;
+            border-radius: 6px !important;
           }
 
           .print-compact-header {
-            padding: 7px 9px !important;
-            margin-bottom: 5px !important;
+            padding: 6px 8px !important;
+            margin-bottom: 4px !important;
           }
 
           .print-compact-header h2 {
-            font-size: 16px !important;
+            font-size: 15px !important;
             line-height: 1.1 !important;
             margin-top: 2px !important;
           }
 
           .print-compact-header p {
-            font-size: 8.5px !important;
-            line-height: 1.15 !important;
+            font-size: 8px !important;
+            line-height: 1.1 !important;
           }
 
           .print-summary {
-            display: flex !important;
+            display: grid !important;
+            grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+            align-items: center !important;
             width: 100% !important;
+            gap: 3px !important;
+            box-sizing: border-box !important;
+            padding: 2px 0 4px !important;
+            margin: 0 0 4px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+          }
+
+          .print-summary span {
+            min-width: 0 !important;
+            text-align: center !important;
+            font-size: 7.3px !important;
+            line-height: 1 !important;
           }
 
           .screen-summary {
@@ -211,9 +240,11 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
           }
 
           .print-table-wrap {
+            display: block !important;
             overflow: visible !important;
             width: 100% !important;
             max-width: none !important;
+            min-width: 0 !important;
           }
 
           .print-table {
@@ -222,6 +253,7 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
             min-width: 0 !important;
             table-layout: fixed !important;
             border-collapse: collapse !important;
+            box-sizing: border-box !important;
           }
 
           .print-table thead {
@@ -235,33 +267,34 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
 
           .print-table th,
           .print-table td {
-            padding: 2.5px 4px !important;
-            font-size: 8.5px !important;
-            line-height: 1.12 !important;
+            box-sizing: border-box !important;
+            padding: 2.2px 3.5px !important;
+            font-size: 8.1px !important;
+            line-height: 1.08 !important;
             vertical-align: top !important;
-            word-break: normal !important;
             overflow-wrap: anywhere !important;
+            word-break: normal !important;
           }
 
           .print-table th {
-            padding-top: 3px !important;
-            padding-bottom: 3px !important;
-            font-size: 7.2px !important;
-            line-height: 1.05 !important;
-            letter-spacing: .035em !important;
+            padding-top: 2.5px !important;
+            padding-bottom: 2.5px !important;
+            font-size: 7px !important;
+            line-height: 1 !important;
+            letter-spacing: .025em !important;
           }
 
           .print-table td:nth-child(1),
-          .print-table th:nth-child(1) { width: 17%; }
+          .print-table th:nth-child(1) { width: 17.5%; }
 
           .print-table td:nth-child(2),
-          .print-table th:nth-child(2) { width: 22%; }
+          .print-table th:nth-child(2) { width: 22.5%; }
 
           .print-table td:nth-child(3),
-          .print-table th:nth-child(3) { width: 10%; }
+          .print-table th:nth-child(3) { width: 9.5%; }
 
           .print-table td:nth-child(4),
-          .print-table th:nth-child(4) { width: 12%; }
+          .print-table th:nth-child(4) { width: 11.5%; }
 
           .print-table td:nth-child(5),
           .print-table th:nth-child(5) { width: 5%; }
@@ -273,15 +306,16 @@ export default function RelatorioEfetividade({ escolaInicialId = null, mesAnoIni
           .print-table th:nth-child(7) { width: 15%; }
 
           .print-status {
-            padding: 1.5px 4px !important;
-            font-size: 7px !important;
+            padding: 1.3px 3.5px !important;
+            font-size: 6.8px !important;
             line-height: 1 !important;
             white-space: nowrap !important;
           }
 
           .print-footer {
-            margin-top: 4px !important;
-            font-size: 7px !important;
+            margin-top: 3px !important;
+            font-size: 6.7px !important;
+            line-height: 1 !important;
           }
         }
 
