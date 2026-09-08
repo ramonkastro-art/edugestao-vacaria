@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage'
 import EditarServidor from './pages/EditarServidor'
 import Relatorios from './pages/Relatorios'
 import RevisaoCadastros from './pages/RevisaoCadastros'
+import RelatorioEfetividade from './pages/RelatorioEfetividade'
 import ServidorModal from './components/ServidorModal'
 import TransferirLotacaoModal from './components/TransferirLotacaoModal'
 import AdicionarHistoricoLotacaoModal from './components/AdicionarHistoricoLotacaoModal'
@@ -499,6 +500,7 @@ export default function App() {
   const [searchOpen,setSearchOpen]=useState(false)
   const [sidebarOpen,setSidebarOpen]=useState(true)
   const [dataVersion,setDataVersion]=useState(0)
+  const [relatorioEfetividade,setRelatorioEfetividade]=useState({ escolaId: null, mesAno: mesAnoAtual() })
   const {servidores:allServidores,reload:reloadServidores}=useServidores()
 
   useEffect(()=>{
@@ -533,6 +535,11 @@ export default function App() {
 
   function handleSelectSchool(escola){setSelectedSchool(escola);setView('school-detail')}
   function navigate(id){setView(id);setSelectedSchool(null)}
+  function openRelatorioEfetividade(escolaId, mesAno){
+    setRelatorioEfetividade({ escolaId, mesAno })
+    setView('relatorio-efetividade')
+    setSelectedSchool(null)
+  }
   function podeEditarServidor(srv){
     if (admin) return true
     return diretora && (srv?.lotacoes ?? []).some(lotacao => String(lotacao.escola_id) === String(profile.escola_id) && !lotacao.data_fim)
@@ -656,7 +663,14 @@ export default function App() {
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
           {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
           {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null} refreshToken={dataVersion}/>}
-          {view==='efe'&&<EfetividadeModule onOpenServidor={setSelectedServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null}/>}
+          {view==='efe'&&<EfetividadeModule onOpenServidor={setSelectedServidor} onOpenRelatorio={openRelatorioEfetividade} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null}/>}
+          {view==='relatorio-efetividade'&&<RelatorioEfetividade
+            escolaInicialId={relatorioEfetividade.escolaId}
+            mesAnoInicial={relatorioEfetividade.mesAno}
+            escolaPermitidaId={diretora ? profile?.escola_id : null}
+            onBack={()=>setView('efe')}
+          />}
+
           {view==='relatorios'&&<Relatorios onEditSolicitacao={admin ? (item => { const servidor = allServidores.find(s => s.id === item.servidor_id) ?? item.servidor; setSolicitacaoTransferenciaEdit({ servidor, solicitacao: item }) }) : null}/>}
           {view==='revisao'&&<RevisaoCadastros servidores={allServidores} escolas={escolas} onEditServidor={openEditServidor} canEdit={podeGerenciarServidor} refreshToken={dataVersion}/>}
         </main>

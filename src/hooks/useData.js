@@ -285,7 +285,7 @@ export function useEfetividade(escolaId, mesAno) {
     return () => { ativa = false }
   }, [escolaId, mesAno])
 
-  async function salvarEfe(servidorId, status, ocorrencia = null, observacoes = '') {
+  async function salvarEfe(servidorId, status, ocorrencia = null, observacoes = '', diasAusencia = null, detalhesOcorrencia = '') {
     if (!escolaId || !mesAno || !servidorId) return { error: new Error('Escola, mês e servidor são obrigatórios.') }
     setSaving(true)
     setError('')
@@ -298,6 +298,8 @@ export function useEfetividade(escolaId, mesAno) {
         status,
         ocorrencia,
         observacoes: String(observacoes ?? '').trim() || null,
+        dias_ausencia: diasAusencia == null || diasAusencia === '' ? null : Number(diasAusencia),
+        detalhes_ocorrencia: String(detalhesOcorrencia ?? '').trim() || null,
         registrado_por: authData?.user?.email,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'servidor_id,escola_id,mes_ano' }).select().single()
@@ -307,7 +309,7 @@ export function useEfetividade(escolaId, mesAno) {
         return { error: requestError }
       }
 
-      setEfe(prev => ({ ...prev, [servidorId]: data ?? { servidor_id: servidorId, status, ocorrencia, observacoes } }))
+      setEfe(prev => ({ ...prev, [servidorId]: data ?? { servidor_id: servidorId, status, ocorrencia, observacoes, dias_ausencia: diasAusencia, detalhes_ocorrencia: detalhesOcorrencia } }))
       return { data, error: null }
     } catch (requestError) {
       const normalizedError = comoErro(requestError, 'Não foi possível salvar a efetividade.')

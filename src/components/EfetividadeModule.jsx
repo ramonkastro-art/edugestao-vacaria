@@ -45,28 +45,32 @@ function StatusAtual({ registro }) {
 function ServidorEfetividadeRow({ servidor, registro, disabled, saving, onSave, onOpenServidor }) {
   const [ocorrencia, setOcorrencia] = useState(registro?.status === 'ocorrencia' ? rotuloOcorrencia(registro.ocorrencia ?? '') : '')
   const [observacoes, setObservacoes] = useState(registro?.observacoes ?? '')
+  const [diasAusencia, setDiasAusencia] = useState(registro?.dias_ausencia ?? '')
+  const [detalhesOcorrencia, setDetalhesOcorrencia] = useState(registro?.detalhes_ocorrencia ?? '')
   const [mostrarObservacao, setMostrarObservacao] = useState(registro?.status === 'ocorrencia')
 
   const temOcorrencia = Boolean(ocorrencia)
   const observacaoAlterada = observacoes !== (registro?.observacoes ?? '')
 
   function salvarTudoOk() {
-    onSave({ servidorId: servidor.id, status: 'ok', ocorrencia: null, observacoes: '' })
+    onSave({ servidorId: servidor.id, status: 'ok', ocorrencia: null, observacoes: '', diasAusencia: null, detalhesOcorrencia: '' })
     setOcorrencia('')
     setObservacoes('')
+    setDiasAusencia('')
+    setDetalhesOcorrencia('')
     setMostrarObservacao(false)
   }
 
   function selecionarOcorrencia(valor) {
     setOcorrencia(valor)
     setMostrarObservacao(Boolean(valor))
-    if (valor) onSave({ servidorId: servidor.id, status: 'ocorrencia', ocorrencia: valor, observacoes })
-    else onSave({ servidorId: servidor.id, status: 'pendente', ocorrencia: null, observacoes: '' })
+    if (valor) onSave({ servidorId: servidor.id, status: 'ocorrencia', ocorrencia: valor, observacoes, diasAusencia, detalhesOcorrencia })
+    else onSave({ servidorId: servidor.id, status: 'pendente', ocorrencia: null, observacoes: '', diasAusencia: null, detalhesOcorrencia: '' })
   }
 
   function salvarObservacao() {
     if (!ocorrencia) return
-    onSave({ servidorId: servidor.id, status: 'ocorrencia', ocorrencia, observacoes })
+    onSave({ servidorId: servidor.id, status: 'ocorrencia', ocorrencia, observacoes, diasAusencia, detalhesOcorrencia })
   }
 
   return (
@@ -93,12 +97,29 @@ function ServidorEfetividadeRow({ servidor, registro, disabled, saving, onSave, 
         {temOcorrencia && <button type="button" onClick={() => setMostrarObservacao(valor => !valor)} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium"><FileText size={13} /> Observação</button>}
       </div>
 
-      {temOcorrencia && mostrarObservacao && <div className="flex flex-col sm:flex-row gap-2 mt-2"><input value={observacoes} disabled={disabled || saving} onChange={event => setObservacoes(event.target.value)} placeholder={ocorrencia === 'Falta sem atestado' ? 'Informe, se necessário, o motivo ou a observação da direção' : 'Ex.: atestado de 2 dias, protocolo ou observação da direção'} className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 outline-none focus:border-[#0f789c] disabled:opacity-60" /><button type="button" onClick={salvarObservacao} disabled={disabled || saving || !observacaoAlterada} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl brand-primary text-white text-xs font-semibold disabled:opacity-40"><Check size={13} /> Salvar</button></div>}
+      {temOcorrencia && mostrarObservacao && (
+        <div className="mt-2 space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-[120px_minmax(0,1fr)] gap-2">
+            <label className="block">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Dias</span>
+              <input type="number" min="0" max="31" value={diasAusencia} disabled={disabled || saving} onChange={event => setDiasAusencia(event.target.value)} placeholder="0" className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 outline-none focus:border-[#0f789c] disabled:opacity-60" />
+            </label>
+            <label className="block">
+              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Detalhamento</span>
+              <input value={detalhesOcorrencia} disabled={disabled || saving} onChange={event => setDetalhesOcorrencia(event.target.value)} placeholder="Ex.: atestado médico, licença maternidade, período da licença..." className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 outline-none focus:border-[#0f789c] disabled:opacity-60" />
+            </label>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input value={observacoes} disabled={disabled || saving} onChange={event => setObservacoes(event.target.value)} placeholder={ocorrencia === 'Falta sem atestado' ? 'Observação adicional da direção' : 'Observação administrativa, protocolo ou referência'} className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 outline-none focus:border-[#0f789c] disabled:opacity-60" />
+            <button type="button" onClick={salvarObservacao} disabled={disabled || saving || (!observacaoAlterada && String(diasAusencia ?? '') === String(registro?.dias_ausencia ?? '') && String(detalhesOcorrencia ?? '') === String(registro?.detalhes_ocorrencia ?? ''))} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl brand-primary text-white text-xs font-semibold disabled:opacity-40"><Check size={13} /> Salvar detalhes</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-export default function EfetividadeModule({ onOpenServidor, canEdit = false, escolaPermitidaId = null }) {
+export default function EfetividadeModule({ onOpenServidor, onOpenRelatorio, canEdit = false, escolaPermitidaId = null }) {
   const { escolas, loading: loadingEscolas, error: escolasError } = useEscolas()
   const [escolaId, setEscolaId] = useState(escolaPermitidaId ? String(escolaPermitidaId) : '')
   const [mesAno, setMesAno] = useState(mesAnoAtual())
@@ -134,10 +155,10 @@ export default function EfetividadeModule({ onOpenServidor, canEdit = false, esc
     setMensagem('')
   }
 
-  async function salvarRegistro({ servidorId, status, ocorrencia, observacoes }) {
+  async function salvarRegistro({ servidorId, status, ocorrencia, observacoes, diasAusencia = null, detalhesOcorrencia = '' }) {
     setSalvandoId(servidorId)
     setMensagem('')
-    const resultado = await salvarEfe(servidorId, status, ocorrencia, observacoes)
+    const resultado = await salvarEfe(servidorId, status, ocorrencia, observacoes, diasAusencia, detalhesOcorrencia)
     setSalvandoId(null)
     if (!resultado.error) setMensagem(status === 'ok' ? 'Registro marcado como Tudo OK.' : status === 'ocorrencia' ? 'Ocorrência registrada na competência.' : 'Registro limpo e voltou para pendente.')
   }
@@ -146,7 +167,10 @@ export default function EfetividadeModule({ onOpenServidor, canEdit = false, esc
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div><h1 className="text-xl font-semibold text-slate-900">Efetividade</h1><p className="text-sm text-slate-500 mt-1">Conferência mensal da unidade · marque Tudo OK ou registre atestados e ocorrências.</p></div>
-        <button type="button" onClick={() => { reloadServidores() }} className="self-start p-2.5 rounded-xl hover:bg-white transition-colors" title="Atualizar servidores" aria-label="Atualizar servidores"><RefreshCw size={16} className="text-slate-500" /></button>
+        <div className="flex items-center gap-2">
+          {escolaId && onOpenRelatorio && <button type="button" onClick={() => onOpenRelatorio(Number(escolaId), mesAno)} className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl brand-primary text-white text-xs font-semibold shadow-sm"><FileText size={14} /> Relatório mensal</button>}
+          <button type="button" onClick={() => { reloadServidores() }} className="self-start p-2.5 rounded-xl hover:bg-white transition-colors" title="Atualizar servidores" aria-label="Atualizar servidores"><RefreshCw size={16} className="text-slate-500" /></button>
+        </div>
       </div>
 
       {erro && <div className="p-3 bg-red-50 border border-red-100 rounded-2xl text-sm text-red-700"><p className="font-medium">Não foi possível carregar a efetividade.</p><p className="text-xs mt-1 break-words">{erro}</p><p className="text-xs mt-2 text-red-600">A tabela mensal existente é usada neste módulo; confira RLS e a migração de segurança se necessário.</p></div>}
