@@ -240,6 +240,7 @@ export function useServidoresByEscola(escolaId, mesAno = null) {
     setMigrationWarning(false);
 
     try {
+      let avisoMigracao = false;
       let result = await supabase
         .from("lotacoes")
         .select(SERVIDORES_POR_ESCOLA_SELECT)
