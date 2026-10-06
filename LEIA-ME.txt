@@ -1,0 +1,13 @@
+CORREÇÃO UNIFICADA — EFETIVIDADE + REVISÃO DE CADASTROS
+
+Substitua no projeto:
+src/App.jsx
+src/components/EfetividadeModule.jsx
+src/hooks/useData.js
+
+Adicione/substitua:
+src/pages/RelatorioEfetividade.jsx
+src/pages/RevisaoCadastros.jsx
+
+O migration SQL já foi executado no Supabase anteriormente; não é necessário executá-lo novamente.
+Depois rode: npm run build
