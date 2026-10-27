@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Search, School, Users, Home, FileText, LogOut,
   CheckCircle2, AlertCircle, X, Menu, ChevronRight,
@@ -6,6 +6,8 @@ import {
   UserPlus, Edit2, Filter, ArrowRightLeft,
 } from 'lucide-react'
 import { useAuth } from './contexts/AuthContext'
+import { supabase } from './lib/supabase'
+import { construirLinhasQuadro, normalizarNomeQuadro, obterLinhasMarcadasDaEscola, obterNovosCandidatosDaEscola, obterPendenciasTransferenciaDaEscola, obterSugestaoTransferenciaSegura } from './lib/quadroPreview'
 import LoginPage from './pages/LoginPage'
 import EditarServidor from './pages/EditarServidor'
 import Relatorios from './pages/Relatorios'
@@ -319,60 +321,343 @@ function SchoolsGrid({ onSelectSchool }) {
 
 // ─── SCHOOL QUADRO ───────────────────────────────────────────────────────────
 
-function SchoolQuadro({ escola, onBack, onOpenServidor }) {
-  const {servidores,loading,reload,error,migrationWarning}=useServidoresByEscola(escola.id)
-  const {efe,salvarEfe,saving}=useEfetividade(escola.id,mesAnoAtual())
-  const [search,setSearch]=useState('')
-  const filtered=useMemo(()=>servidores.filter(s=>search===''||s.nome.toLowerCase().includes(search.toLowerCase())),[servidores,search])
+function SchoolQuadro({
+  escola,
+  onBack,
+  onOpenServidor,
+  admin = false,
+  servidoresConhecidos = [],
+  previsaoQuadro = null,
+  previsaoLoading = false,
+  previsaoError = '',
+  onAtualizarPrevia,
+  onPrepararCadastro,
+  onIniciarTransferencia,
+}) {
+  const { servidores, loading, reload, error, migrationWarning } = useServidoresByEscola(escola.id)
+  const { efe, salvarEfe, saving } = useEfetividade(escola.id, mesAnoAtual())
+  const [search, setSearch] = useState('')
+  const respostaPrevia = previsaoQuadro?.data ?? null
+  const linhasMarcadas = useMemo(
+    () => obterLinhasMarcadasDaEscola(respostaPrevia, escola.id),
+    [respostaPrevia, escola.id],
+  )
+  const linhasQuadro = useMemo(
+    () => construirLinhasQuadro({
+      servidores,
+      linhasMarcadas,
+      servidoresConhecidos,
+      escolaId: escola.id,
+    }),
+    [servidores, linhasMarcadas, servidoresConhecidos, escola.id],
+  )
+  const novosCandidatos = useMemo(
+    () => obterNovosCandidatosDaEscola(respostaPrevia, escola.id),
+    [respostaPrevia, escola.id],
+  )
+  const pendenciasTransferencia = useMemo(
+    () => obterPendenciasTransferenciaDaEscola(respostaPrevia, escola.id),
+    [respostaPrevia, escola.id],
+  )
+  const textoBuscaNormalizado = normalizarNomeQuadro(search)
+  const novosCandidatosFiltrados = useMemo(() => novosCandidatos.filter((item) => {
+    if (!textoBuscaNormalizado) return true
+    const texto = [item.nome_fonte, item.secao, item.atuacao, item.escola_nome, item.linha_excel == null ? '' : `linha ${item.linha_excel}`].filter(Boolean).join(' ')
+    return normalizarNomeQuadro(texto).includes(textoBuscaNormalizado)
+  }), [novosCandidatos, textoBuscaNormalizado])
+  const pendenciasTransferenciaFiltradas = useMemo(() => pendenciasTransferencia.filter((item) => {
+    if (!textoBuscaNormalizado) return true
+    const escolasEncontradas = Array.isArray(item.encontrado_no_quadro_de) ? item.encontrado_no_quadro_de : []
+    const texto = [item.nome_servidor, item.nome_fonte, item.motivo, item.escola_atual_registrada_no_edugestao?.escola_nome, ...escolasEncontradas.map((x) => x?.escola_nome)].filter(Boolean).join(' ')
+    return normalizarNomeQuadro(texto).includes(textoBuscaNormalizado)
+  }), [pendenciasTransferencia, textoBuscaNormalizado])
+  const coberturaGlobalCompleta = respostaPrevia?.resumo?.reconciliacao_global_completa_no_escopo === true
+  const filtered = useMemo(() => {
+    const consulta = normalizarNomeQuadro(search).toLowerCase()
+    if (!consulta) return linhasQuadro
+    return linhasQuadro.filter((entrada) => {
+      const linha = entrada.linha ?? entrada.revisao ?? {}
+      const texto = [
+        entrada.nome,
+        entrada.servidor?.funcao,
+        linha.atuacao,
+        linha.secao,
+        linha.linha_excel == null ? '' : `linha ${linha.linha_excel}`,
+      ].filter(Boolean).join(' ')
+      return normalizarNomeQuadro(texto).toLowerCase().includes(consulta)
+    })
+  }, [linhasQuadro, search])
+  const detalhePrevia = Array.isArray(respostaPrevia?.escolas)
+    ? respostaPrevia.escolas.find((item) => Number(item?.escola_id) === Number(escola.id))
+    : null
+  const previaAbrangeEscola = Boolean(detalhePrevia)
+  const dataPreviaLabel = previsaoQuadro?.carregadaEm
+    ? new Date(previsaoQuadro.carregadaEm).toLocaleString('pt-BR')
+    : ''
 
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-3">
-        <button onClick={onBack} className="p-2 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors shrink-0">
-          <ChevronRight size={18} className="text-slate-400 rotate-180"/>
+        <button onClick={onBack} className="p-2 rounded-xl hover:bg-slate-100 active:bg-slate-200 transition-colors shrink-0" aria-label="Voltar para as unidades">
+          <ChevronRight size={18} className="text-slate-400 rotate-180" />
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-base font-semibold text-slate-900 leading-tight">{escola.name}</h1>
-            <Badge className={TIPO_COLORS[escola.tipo]??'bg-slate-100 text-slate-600 border-slate-200'}>{escola.tipo}</Badge>
+            <Badge className={TIPO_COLORS[escola.tipo] ?? 'bg-slate-100 text-slate-600 border-slate-200'}>{escola.tipo}</Badge>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">{loading?'…':`${servidores.length} servidores`} · {mesAnoLabel(mesAnoAtual())}</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {loading ? '…' : `${servidores.length} servidores com lotação ativa no EduGestão`}
+            {' · '}{mesAnoLabel(mesAnoAtual())}
+          </p>
         </div>
-        <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0">
-          <RefreshCw size={15} className="text-slate-400"/>
+        <button onClick={reload} className="p-2 rounded-xl hover:bg-slate-100 transition-colors shrink-0" aria-label="Atualizar servidores do EduGestão" title="Atualizar dados do EduGestão">
+          <RefreshCw size={15} className="text-slate-400" />
         </button>
       </div>
-      <DataBanner error={error} migrationWarning={migrationWarning}/>
-      <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
-        <Search size={15} className="text-slate-400"/>
-        <input className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-          placeholder="Buscar servidor..." value={search} onChange={e=>setSearch(e.target.value)}/>
-        {search&&<button onClick={()=>setSearch('')}><X size={14} className="text-slate-400"/></button>}
-      </div>
-      {loading?<Spinner/>:(
-        <div className="space-y-2">
-          {filtered.length===0&&<div className="text-center py-16 text-slate-400"><Users size={32} className="mx-auto mb-2 opacity-30"/><p className="text-sm">Nenhum servidor encontrado</p></div>}
-          {filtered.map(srv=>{
-            const outrasEscolas=(srv.lotacoes??[]).filter(l=>!l.data_fim&&l.escola_id!==escola.id).map(l=>l.escola?.name).filter(Boolean)
-            const efeS=efe[srv.id]
+
+      <DataBanner error={error} migrationWarning={migrationWarning} />
+
+      {admin && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2" aria-label="Prévia de revisão de lotações">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-800">Prévia dos quadros atualizados</p>
+              <p className="text-xs text-slate-500 mt-1">Consulta manual do Quadro Geral no Drive. Os dados são apenas para conferência e não alteram cadastros ou lotações.</p>
+            </div>
+            <button
+              onClick={onAtualizarPrevia}
+              disabled={previsaoLoading}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-wait shrink-0"
+            >
+              {previsaoLoading
+                ? <Loader2 size={14} className="animate-spin" />
+                : <RefreshCw size={14} />}
+              <span>{previsaoLoading ? 'Consultando…' : 'Atualizar prévia'}</span>
+            </button>
+          </div>
+          {previsaoQuadro && (
+            <p className="text-xs text-slate-500">
+              Última consulta: {dataPreviaLabel || 'horário indisponível'}
+              {' · '}{Number(respostaPrevia?.resumo?.linhas_com_marcador_revisao ?? 0)} linhas sinalizadas na prévia global
+              {respostaPrevia?.resumo?.escolas_com_erro
+                ? ` · ${respostaPrevia.resumo.escolas_com_erro} escola(s) com erro`
+                : ''}
+            </p>
+          )}
+          {!previsaoQuadro && !previsaoLoading && !previsaoError && (
+            <p className="text-xs text-slate-500">A prévia ainda não foi carregada nesta sessão.</p>
+          )}
+          {previsaoError && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+              <p className="font-semibold">Não foi possível atualizar a prévia.</p>
+              <p className="mt-1 break-words">{previsaoError}</p>
+              {previsaoQuadro && <p className="mt-1">Os marcadores abaixo, se houver, pertencem à última consulta concluída em {dataPreviaLabel}.</p>}
+            </div>
+          )}
+        </section>
+      )}
+
+      {admin && previsaoQuadro && linhasMarcadas.length > 0 && (
+        <div role="note" className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <p>O quadro atualizado indica uma lotação diferente da registrada no EduGestão. Confira antes de realizar qualquer alteração. O vínculo anterior permanece visível; nenhuma transferência ou gravação é feita por esta prévia.</p>
+        </div>
+      )}
+
+      {admin && previsaoQuadro && !coberturaGlobalCompleta && (
+        <div role="note" className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          A reconciliação não foi confirmada como completa no escopo elegível desta prévia. Por segurança, esta tela não apresenta nomes como candidatos confiáveis a novo cadastro. Revise a cobertura antes de tratar uma pessoa como nova.
+        </div>
+      )}
+
+      {admin && previsaoQuadro && pendenciasTransferenciaFiltradas.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-white p-3 space-y-3" aria-label="Pendências de transferência para conferência">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Possíveis transferências para conferência</p>
+            <p className="text-xs text-slate-500 mt-1">São sugestões do cruzamento entre o EduGestão e o Quadro Geral. Nenhuma lotação é alterada sem confirmação humana no modal de transferência.</p>
+          </div>
+          {pendenciasTransferenciaFiltradas.map((pendencia, indice) => {
+            const sugestao = obterSugestaoTransferenciaSegura(pendencia, servidoresConhecidos)
+            const origem = pendencia.escola_atual_registrada_no_edugestao
+            const destinos = Array.isArray(pendencia.encontrado_no_quadro_de) ? pendencia.encontrado_no_quadro_de : []
+            const nome = pendencia.nome_servidor ?? pendencia.nome_fonte ?? pendencia.nome_no_edugestao ?? 'Servidor a identificar'
+            const chave = `${pendencia.tipo ?? pendencia.acao_preliminar ?? 'transferencia'}-${pendencia.servidor_id ?? normalizarNomeQuadro(nome)}-${origem?.escola_id ?? pendencia.escola_id ?? 'sem-origem'}-${indice}`
             return (
-              <div key={srv.id} className="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
-                <div className="cursor-pointer shrink-0" onClick={()=>onOpenServidor(srv)}><AvatarCircle name={srv.nome}/></div>
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={()=>onOpenServidor(srv)}>
-                  <p className="text-sm font-semibold text-slate-800 leading-snug">{srv.nome}</p>
-                  {srv.funcao&&<p className="text-xs text-slate-400 truncate">{srv.funcao}</p>}
-                  {outrasEscolas.length>0&&<p className="text-xs text-blue-500 truncate">+ {outrasEscolas.join(', ')}</p>}
+              <div key={chave} className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 space-y-2">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0"><ArrowRightLeft size={16}/></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-800">{nome}</p>
+                    {origem?.escola_nome && <p className="text-xs text-slate-600 mt-1">Lotação atual no EduGestão: {origem.escola_nome}</p>}
+                    {destinos.length > 0 && <p className="text-xs text-slate-600 mt-1">Encontrado no quadro de: {[...new Set(destinos.map((x) => x?.escola_nome).filter(Boolean))].join(', ') || 'escola(s) a conferir'}</p>}
+                    {pendencia.motivo && <p className="text-xs text-amber-900 mt-1">{pendencia.motivo}</p>}
+                  </div>
                 </div>
-                <div className="w-full sm:w-auto flex items-center justify-end gap-1 shrink-0">
-                  <button onClick={()=>salvarEfe(srv.id,'ok',null)}
-                    className={`p-2 rounded-xl transition-all ${efeS?.status==='ok'?'bg-emerald-500 text-white':'bg-slate-100 text-slate-500'}`}>
-                    <CheckCircle2 size={15}/>
+                {sugestao ? (
+                  <button
+                    type="button"
+                    onClick={() => onIniciarTransferencia?.(sugestao)}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-700"
+                  >
+                    <ArrowRightLeft size={13}/>
+                    Abrir transferência para conferência
                   </button>
-                  <button onClick={()=>salvarEfe(srv.id,'ocorrencia','Falta')}
-                    className={`p-2 rounded-xl transition-all ${efeS?.status==='ocorrencia'?'bg-amber-400 text-white':'bg-slate-100 text-slate-500'}`}>
-                    <AlertCircle size={15}/>
-                  </button>
-                  {saving&&<Loader2 size={13} className="animate-spin text-slate-400"/>}
+                ) : (
+                  <p className="text-[11px] text-slate-500">Ação guiada indisponível: confirme manualmente a identidade, a lotação de origem e o destino antes de iniciar uma transferência.</p>
+                )}
+              </div>
+            )
+          })}
+        </section>
+      )}
+
+      {admin && previsaoQuadro && coberturaGlobalCompleta && novosCandidatos.length === 0 && (
+        <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500">A prévia não classificou nenhum nome como candidato confiável a novo cadastro nesta escola. Isso não equivale a uma confirmação de desligamento nem autoriza inserir pessoas automaticamente.</p>
+      )}
+
+      {admin && previsaoQuadro && coberturaGlobalCompleta && novosCandidatosFiltrados.length > 0 && (
+        <section className="rounded-2xl border border-sky-200 bg-white p-3 space-y-3" aria-label="Novos nomes para conferência de cadastro">
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-800">Novos nomes para conferência</p>
+              <Badge className="bg-sky-50 text-sky-700 border-sky-200">{novosCandidatosFiltrados.length}</Badge>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Nomes encontrados no Quadro Geral sem correspondência identificada no cadastro durante uma reconciliação completa do escopo elegível. Ainda não foram cadastrados.</p>
+          </div>
+          {novosCandidatosFiltrados.map((candidato, indice) => {
+            const chave = `${candidato.escola_id}-${candidato.linha_excel ?? 'sem-linha'}-${normalizarNomeQuadro(candidato.nome_fonte)}-${indice}`
+            return (
+              <div key={chave} className="rounded-xl border border-sky-100 bg-sky-50/50 p-3 space-y-2">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-800 flex items-center justify-center shrink-0"><UserPlus size={16}/></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-800">{candidato.nome_fonte}</p>
+                      <Badge className="bg-amber-50 text-amber-800 border-amber-200">Conferir cadastro</Badge>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">Fonte: Quadro Geral atualizado{candidato.linha_excel == null ? '' : ` · linha ${candidato.linha_excel}`}</p>
+                    {candidato.secao && <p className="text-xs text-slate-600 mt-1">Seção: {candidato.secao}</p>}
+                    {candidato.atuacao && <p className="text-xs text-slate-600 mt-1">Atuação: {candidato.atuacao}</p>}
+                    {candidato.motivo && <p className="text-xs text-slate-500 mt-1">{candidato.motivo}</p>}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onPrepararCadastro?.(candidato)}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-sky-200 bg-white text-sky-800 text-xs font-semibold hover:bg-sky-100"
+                >
+                  <UserPlus size={13}/>
+                  Preparar cadastro para conferência
+                </button>
+                <p className="text-[11px] text-slate-500">O formulário será pré-preenchido. Nenhum registro será criado até você revisar e salvar manualmente.</p>
+              </div>
+            )
+          })}
+        </section>
+      )}
+
+      <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
+        <Search size={15} className="text-slate-400" />
+        <input
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+          placeholder="Buscar servidor ou atuação…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          aria-label="Buscar servidor, seção ou atuação no quadro"
+        />
+        {search && <button onClick={() => setSearch('')} aria-label="Limpar busca"><X size={14} className="text-slate-400" /></button>}
+      </div>
+
+      {previsaoQuadro && previaAbrangeEscola && linhasMarcadas.length === 0 && (
+        <p className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-xs text-slate-500">
+          A última prévia não retornou linhas com marcador de revisão para esta escola. Pendências de transferência e candidatos a cadastro, quando houver, são apresentados em seções próprias.
+        </p>
+      )}
+
+      {loading ? <Spinner /> : (
+        <div className="space-y-2">
+          {filtered.length === 0 && (
+            <div className="text-center py-16 text-slate-400">
+              <Users size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Nenhum servidor ou linha do quadro encontrado</p>
+            </div>
+          )}
+          {filtered.map((entrada) => {
+            const srv = entrada.servidor
+            if (entrada.tipo === 'servidor' && srv) {
+              const outrasEscolas = (srv.lotacoes ?? [])
+                .filter((lotacao) => !lotacao.data_fim && lotacao.escola_id !== escola.id)
+                .map((lotacao) => lotacao.escola?.name)
+                .filter(Boolean)
+              const efeS = efe[srv.id]
+              return (
+                <div key={entrada.chave} className="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
+                  <div className="cursor-pointer shrink-0" onClick={() => onOpenServidor(srv)}>
+                    <AvatarCircle name={srv.nome} />
+                  </div>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onOpenServidor(srv)}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-800 leading-snug">{srv.nome}</p>
+                      {entrada.revisao && <Badge className="bg-amber-50 text-amber-800 border-amber-200">⚠ Revisar lotação</Badge>}
+                    </div>
+                    {srv.funcao && <p className="text-xs text-slate-400 truncate">{srv.funcao}</p>}
+                    {entrada.revisao && <p className="text-[11px] text-amber-800 mt-1">Lotação ativa registrada no EduGestão · presença mantida para conferência</p>}
+                    {outrasEscolas.length > 0 && <p className="text-xs text-blue-500 truncate">+ {outrasEscolas.join(', ')}</p>}
+                  </div>
+                  <div className="w-full sm:w-auto flex items-center justify-end gap-1 shrink-0">
+                    <button
+                      onClick={() => salvarEfe(srv.id, 'ok', null)}
+                      aria-label={`Marcar ${srv.nome} sem ocorrência`}
+                      title="Sem ocorrência"
+                      className={`p-2 rounded-xl transition-all ${efeS?.status === 'ok' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}
+                    >
+                      <CheckCircle2 size={15} />
+                    </button>
+                    <button
+                      onClick={() => salvarEfe(srv.id, 'ocorrencia', 'Falta')}
+                      aria-label={`Registrar falta para ${srv.nome}`}
+                      title="Registrar falta"
+                      className={`p-2 rounded-xl transition-all ${efeS?.status === 'ocorrencia' ? 'bg-amber-400 text-white' : 'bg-slate-100 text-slate-500'}`}
+                    >
+                      <AlertCircle size={15} />
+                    </button>
+                    {saving && <Loader2 size={13} className="animate-spin text-slate-400" />}
+                  </div>
+                </div>
+              )
+            }
+
+            const linha = entrada.linha ?? entrada.revisao ?? {}
+            const servidorAssociado = entrada.servidorAssociado ?? null
+            const podeAbrirServidor = Boolean(servidorAssociado)
+            const origemFonte = entrada.tipo === 'linha-fonte'
+            const rotuloOrigem = origemFonte
+              ? `Fonte: Quadro Geral atualizado${linha.linha_excel == null ? '' : ` · linha ${linha.linha_excel}`}`
+              : 'Presença provisória · lotação ativa registrada no EduGestão'
+
+            return (
+              <div key={entrada.chave} className="flex items-start gap-3 p-3 bg-white border border-amber-200 rounded-2xl">
+                <div
+                  className={`shrink-0 ${podeAbrirServidor ? 'cursor-pointer' : ''}`}
+                  onClick={podeAbrirServidor ? () => onOpenServidor(servidorAssociado) : undefined}
+                >
+                  <AvatarCircle name={entrada.nome} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p
+                      className={`text-sm font-semibold text-slate-800 leading-snug ${podeAbrirServidor ? 'cursor-pointer' : ''}`}
+                      onClick={podeAbrirServidor ? () => onOpenServidor(servidorAssociado) : undefined}
+                    >
+                      {entrada.nome || 'Nome não informado'}
+                    </p>
+                    <Badge className="bg-amber-50 text-amber-800 border-amber-200">⚠ Revisar lotação</Badge>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">{rotuloOrigem}</p>
+                  {linha.secao && <p className="text-xs text-slate-500 mt-1">Seção: {linha.secao}</p>}
+                  {linha.atuacao && <p className="text-xs text-slate-600 mt-1">Atuação: {linha.atuacao}</p>}
+                  {linha.motivo_marcador && <p className="text-xs text-amber-800 mt-1">{linha.motivo_marcador}</p>}
                 </div>
               </div>
             )
@@ -491,17 +776,34 @@ export default function App() {
   const [selectedSchool,setSelectedSchool]=useState(null)
   const [selectedServidor,setSelectedServidor]=useState(null)
   const [transferServidor,setTransferServidor]=useState(null)
+  const [transferSuggestion,setTransferSuggestion]=useState(null)
   const [historicoServidor,setHistoricoServidor]=useState(null)
   const [historicoLotacaoEdit,setHistoricoLotacaoEdit]=useState(null)
   const [solicitacaoTransferenciaEdit,setSolicitacaoTransferenciaEdit]=useState(null)
   const [editServidor,setEditServidor]=useState(null)
   const [editarRetorno,setEditarRetorno]=useState(null)
   const [isNovo,setIsNovo]=useState(false)
+  const [novoServidorInicial,setNovoServidorInicial]=useState(null)
   const [searchOpen,setSearchOpen]=useState(false)
   const [sidebarOpen,setSidebarOpen]=useState(true)
   const [dataVersion,setDataVersion]=useState(0)
   const [relatorioEfetividade,setRelatorioEfetividade]=useState({ escolaId: null, mesAno: mesAnoAtual() })
+  const [previsaoQuadro,setPrevisaoQuadro]=useState(null)
+  const [previsaoLoading,setPrevisaoLoading]=useState(false)
+  const [previsaoError,setPrevisaoError]=useState('')
+  const previsaoRequestRef=useRef(0)
   const {servidores:allServidores,reload:reloadServidores}=useServidores()
+
+  // A prévia contém dados de várias escolas. Não a mantenha em memória ao sair
+  // do perfil administrativo ou trocar a sessão autenticada.
+  useEffect(()=>{
+    if(!admin || !user?.id){
+      previsaoRequestRef.current += 1
+      setPrevisaoQuadro(null)
+      setPrevisaoError('')
+      setPrevisaoLoading(false)
+    }
+  },[admin,user?.id])
 
   useEffect(()=>{
     const h=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();setSearchOpen(true)}}
@@ -533,6 +835,59 @@ export default function App() {
   if(!user)return<LoginPage/>
   if(profile?.exigir_troca_senha)return<TrocaSenhaObrigatoria/>
 
+  async function atualizarPreviaQuadros(){
+    if(!admin || previsaoLoading) return
+    const requestId=++previsaoRequestRef.current
+    setPrevisaoLoading(true)
+    setPrevisaoError('')
+    try{
+      const {data,error:invokeError}=await supabase.functions.invoke('bright-task',{
+        body:{
+          modo:'PREVIEW_LOTE_CADASTRO_QUADRO',
+          grupos_incluir:['ei','ef'],
+          aba_quadro:'Quadro Geral',
+        },
+      })
+
+      if(invokeError){
+        let mensagem=invokeError.message || 'A Edge Function não conseguiu concluir a prévia.'
+        const contexto=invokeError.context
+        if(contexto && typeof contexto.clone==='function'){
+          try{
+            const payload=await contexto.clone().json()
+            mensagem=payload?.erro || payload?.mensagem || mensagem
+          }catch{/* A mensagem original permanece disponível. */}
+        }
+        throw new Error(mensagem)
+      }
+
+      if(!data || data.ok!==true || data.modo!=='PREVIEW_LOTE_CADASTRO_QUADRO'){
+        throw new Error(data?.erro || data?.mensagem || 'A resposta não corresponde à prévia de Quadro Geral esperada.')
+      }
+
+      // Falhar fechado: só mostrar a resposta se o próprio backend confirmar o
+      // modo somente leitura e declarar que nenhuma tabela foi alterada.
+      if(data.resumo?.gravacao_realizada!==false || !Array.isArray(data.resumo?.tabelas_alteradas) || data.resumo.tabelas_alteradas.length!==0){
+        throw new Error('A resposta não confirmou os indicadores de somente leitura. A prévia não foi exibida; confira a versão implantada da função.')
+      }
+
+      const possuiContratoLinhas=Array.isArray(data.quadros_com_revisao) || (
+        Array.isArray(data.escolas) && data.escolas.some(escola=>Array.isArray(escola?.linhas_com_marcador_revisao))
+      )
+      if(!possuiContratoLinhas){
+        throw new Error('A resposta não contém quadros_com_revisao nem linhas_com_marcador_revisao. Verifique se a função v7 está implantada.')
+      }
+
+      if(requestId!==previsaoRequestRef.current || !admin) return
+      setPrevisaoQuadro({data,carregadaEm:new Date().toISOString()})
+    }catch(error){
+      if(requestId!==previsaoRequestRef.current) return
+      setPrevisaoError(error?.message || 'Não foi possível carregar a prévia do Quadro Geral.')
+    }finally{
+      if(requestId===previsaoRequestRef.current) setPrevisaoLoading(false)
+    }
+  }
+
   function handleSelectSchool(escola){setSelectedSchool(escola);setView('school-detail')}
   function navigate(id){setView(id);setSelectedSchool(null)}
   function openRelatorioEfetividade(escolaId, mesAno){
@@ -544,11 +899,43 @@ export default function App() {
     if (admin) return true
     return diretora && (srv?.lotacoes ?? []).some(lotacao => String(lotacao.escola_id) === String(profile.escola_id) && !lotacao.data_fim)
   }
-  function openNovoServidor(){
+  function openNovoServidor(initialData = null){
     setEditarRetorno(null)
     setIsNovo(true)
+    setNovoServidorInicial(initialData && typeof initialData === 'object' ? initialData : null)
     setEditServidor({})
     setSelectedServidor(null)
+  }
+  function prepararCadastroCandidato(candidato){
+    if(!admin || !candidato?.nome_fonte || !candidato?.escola_id) return
+    const observacoes = [
+      'Origem: candidato encontrado no Quadro Geral atualizado do Google Drive.',
+      `Escola da fonte: ${candidato.escola_nome || 'não informada'}.`,
+      candidato.linha_excel == null ? '' : `Linha da fonte: ${candidato.linha_excel}.`,
+      candidato.secao ? `Seção da fonte: ${candidato.secao}.` : '',
+      candidato.atuacao ? `Atuação indicada na fonte: ${candidato.atuacao}.` : '',
+      'Cadastro preparado a partir de uma prévia; confirmar identidade e dados funcionais antes de salvar.',
+    ].filter(Boolean).join(' ')
+    openNovoServidor({ origemPrevia: true, nome: String(candidato.nome_fonte).trim(), escola_id: String(candidato.escola_id), observacoes })
+  }
+  function iniciarTransferenciaDaPrevia(sugestao){
+    if(!admin || !sugestao?.servidor || !sugestao.escolaOrigemId || !sugestao.escolaDestinoId) return
+    setSelectedServidor(null)
+    setTransferSuggestion({
+      origemId: String(sugestao.escolaOrigemId),
+      destinoId: String(sugestao.escolaDestinoId),
+    })
+    setTransferServidor(sugestao.servidor)
+  }
+  function fecharTransferencia(){
+    setTransferServidor(null)
+    setTransferSuggestion(null)
+  }
+  async function concluirTransferencia(){
+    setPrevisaoQuadro(null)
+    setPrevisaoError('')
+    setTransferSuggestion(null)
+    return handleDataChanged()
   }
   function openEditServidor(srv){
     // Busca dados completos se vieram da busca (poucos campos).
@@ -556,6 +943,7 @@ export default function App() {
     const completo = allServidores.find(s=>s.id===srv.id)??srv
     setEditarRetorno(selectedServidor?.id === srv.id ? selectedServidor : null)
     setIsNovo(false)
+    setNovoServidorInicial(null)
     setEditServidor(completo)
   }
   function fecharEdicao(restaurar = true){
@@ -563,6 +951,7 @@ export default function App() {
     setEditarRetorno(null)
     setEditServidor(null)
     setIsNovo(false)
+    setNovoServidorInicial(null)
     if (restaurar && retorno) setSelectedServidor(retorno)
   }
   async function handleDataChanged(){
@@ -571,9 +960,16 @@ export default function App() {
   }
   function handleEditorSaved(){
     const retorno = editarRetorno
+    const cadastroNovoConcluido = isNovo
     setEditarRetorno(null)
     setEditServidor(null)
     setIsNovo(false)
+    setNovoServidorInicial(null)
+    if (cadastroNovoConcluido) {
+      // A prévia contém candidatos antigos; após criar o servidor, exigir atualização manual.
+      setPrevisaoQuadro(null)
+      setPrevisaoError('')
+    }
     if (!retorno) {
       setSelectedServidor(null)
       void handleDataChanged()
@@ -617,7 +1013,7 @@ export default function App() {
             </button>
           ))}
           {sidebarOpen&&podeGerenciarServidor&&(
-            <button onClick={openNovoServidor}
+            <button onClick={() => openNovoServidor()}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-emerald-600 hover:bg-emerald-50 transition-all mt-2">
               <UserPlus size={17} className="shrink-0"/><span>Novo Servidor</span>
             </button>
@@ -661,8 +1057,8 @@ export default function App() {
           )}
           {view==='dashboard'&&<VisaoGeral onSelectSchool={handleSelectSchool}/>}
           {view==='schools'&&<SchoolsGrid onSelectSchool={handleSelectSchool}/>}
-          {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor}/>}
-          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={openNovoServidor} onEdit={openEditServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null} refreshToken={dataVersion}/>}
+          {view==='school-detail'&&selectedSchool&&<SchoolQuadro key={dataVersion} escola={selectedSchool} onBack={()=>{setView('schools');setSelectedSchool(null)}} onOpenServidor={setSelectedServidor} admin={admin} servidoresConhecidos={allServidores} previsaoQuadro={previsaoQuadro} previsaoLoading={previsaoLoading} previsaoError={previsaoError} onAtualizarPrevia={atualizarPreviaQuadros} onPrepararCadastro={prepararCadastroCandidato} onIniciarTransferencia={iniciarTransferenciaDaPrevia}/>}
+          {view==='servidores'&&<ServidoresList onOpenServidor={setSelectedServidor} onNovoServidor={() => openNovoServidor()} onEdit={openEditServidor} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null} refreshToken={dataVersion}/>}
           {view==='efe'&&<EfetividadeModule onOpenServidor={setSelectedServidor} onOpenRelatorio={openRelatorioEfetividade} canEdit={podeGerenciarServidor} escolaPermitidaId={diretora ? profile?.escola_id : null}/>}
           {view==='relatorio-efetividade'&&<RelatorioEfetividade
             escolaInicialId={relatorioEfetividade.escolaId}
@@ -685,7 +1081,7 @@ export default function App() {
           servidor={selectedServidor}
           onClose={()=>setSelectedServidor(null)}
           onEdit={podeEditarServidor(selectedServidor)?openEditServidor:null}
-          onTransfer={admin ? (srv => { setSelectedServidor(null); setTransferServidor(srv) }) : null}
+          onTransfer={admin ? (srv => { setSelectedServidor(null); setTransferSuggestion(null); setTransferServidor(srv) }) : null}
           onAddHistorico={admin ? (srv => { setSelectedServidor(null); setHistoricoServidor(srv) }) : null}
           onEditHistorico={admin ? (lotacao => { setHistoricoLotacaoEdit({ servidor: selectedServidor, lotacao }); setSelectedServidor(null) }) : null}
           onAddSolicitacao={admin ? (srv => { setSolicitacaoTransferenciaEdit({ servidor: srv, solicitacao: null }); setSelectedServidor(null) }) : null}
@@ -698,8 +1094,10 @@ export default function App() {
         <TransferirLotacaoModal
           servidor={transferServidor}
           escolas={escolas}
-          onClose={()=>setTransferServidor(null)}
-          onSuccess={handleDataChanged}
+          initialOriginId={transferSuggestion?.origemId}
+          initialDestinationId={transferSuggestion?.destinoId}
+          onClose={fecharTransferencia}
+          onSuccess={concluirTransferencia}
         />
       )}
 
@@ -735,6 +1133,7 @@ export default function App() {
         <EditarServidor
           servidor={isNovo?null:editServidor}
           isNovo={isNovo}
+          initialData={isNovo ? novoServidorInicial : null}
           escolas={escolas}
           onClose={()=>fecharEdicao(true)}
           onSaved={handleEditorSaved}

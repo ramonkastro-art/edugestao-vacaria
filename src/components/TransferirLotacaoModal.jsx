@@ -8,13 +8,18 @@ function formatarData(data) {
   return `${dia}/${mes}/${ano}`
 }
 
-export default function TransferirLotacaoModal({ servidor, escolas = [], onClose, onSuccess }) {
+export default function TransferirLotacaoModal({ servidor, escolas = [], onClose, onSuccess, initialOriginId = null, initialDestinationId = null }) {
   const lotacoesAtuais = useMemo(
     () => (servidor?.lotacoes ?? []).filter(lotacao => !lotacao.data_fim),
     [servidor],
   )
-  const [origemId, setOrigemId] = useState(String(lotacoesAtuais[0]?.escola_id ?? ''))
-  const [destinoId, setDestinoId] = useState('')
+  const [origemId, setOrigemId] = useState(() => {
+    const origemInicial = String(initialOriginId ?? '')
+    return lotacoesAtuais.some(lotacao => String(lotacao.escola_id) === origemInicial)
+      ? origemInicial
+      : String(lotacoesAtuais[0]?.escola_id ?? '')
+  })
+  const [destinoId, setDestinoId] = useState(() => String(initialDestinationId ?? ''))
   const [dataTransferencia, setDataTransferencia] = useState(hojeISO())
   const [motivo, setMotivo] = useState('')
   const [saving, setSaving] = useState(false)

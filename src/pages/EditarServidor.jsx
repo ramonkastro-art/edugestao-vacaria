@@ -207,9 +207,9 @@ function ConfirmModal({ nome, onConfirm, onCancel, loading = false, erro = '' })
   )
 }
 
-export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, escolas = [], isNovo = false, escolaPermitidaId = null, somenteEscola = false, podeExcluir = false }) {
+export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, escolas = [], isNovo = false, initialData = null, escolaPermitidaId = null, somenteEscola = false, podeExcluir = false }) {
   const [form, setForm] = useState({
-    nome:            servidor?.nome            ?? '',
+    nome:            initialData?.nome        ?? servidor?.nome            ?? '',
     status:          servidor?.status          ?? 'Ativo',
     funcao:          servidor?.funcao          ?? '',
     tipo_vinculo:    servidor?.tipo_vinculo    ?? '',
@@ -220,12 +220,13 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
     data_nascimento: servidor?.data_nascimento ?? '',
     endereco:        servidor?.endereco        ?? '',
     formacao:        servidor?.formacao        ?? '',
-    observacoes:     servidor?.observacoes     ?? '',
+    observacoes:     initialData?.observacoes ?? servidor?.observacoes     ?? '',
   })
 
   // Escolas vinculadas (ids como strings)
   const [escolasSel, setEscolasSel] = useState(() => {
     if (somenteEscola && escolaPermitidaId) return [String(escolaPermitidaId)]
+    if (isNovo && initialData?.escola_id != null && String(initialData.escola_id).trim()) return [String(initialData.escola_id)]
     return (servidor?.lotacoes ?? []).filter(l => !l.data_fim).map(l => String(l.escola_id))
   })
 
@@ -249,6 +250,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
     if (!id || escolasSel.includes(id)) return
     setEscolasSel(p => [...p, id])
     setSaved(false)
+    if (errors.escolas) setErrors(p => ({ ...p, escolas: '' }))
   }
   function removeEscola(id) {
     setEscolasSel(p => p.filter(e => e !== id))
@@ -258,6 +260,8 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
   function validate() {
     const errs = {}
     if (!form.nome.trim()) errs.nome = 'Nome é obrigatório'
+    if (isNovo && initialData?.origemPrevia && !form.funcao) errs.funcao = 'Selecione a função/cargo após conferir a linha da fonte.'
+    if (isNovo && initialData?.origemPrevia && escolasSel.length === 0) errs.escolas = 'Selecione a escola de lotação após conferir a fonte.'
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       errs.email = 'E-mail inválido'
     if (dateNascError) errs.data_nascimento = dateNascError
@@ -378,6 +382,12 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
           </div>
         </div>
 
+        {isNovo && initialData?.origemPrevia && (
+          <div role="note" className="mx-5 mt-3 p-3 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-900">
+            Este formulário veio de um candidato da prévia, não de um cadastro confirmado. Confira a identidade, selecione a função/cargo e confirme a escola de lotação. O servidor só será criado depois de você salvar manualmente.
+          </div>
+        )}
+
         {/* Corpo scrollável */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
 
@@ -457,6 +467,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
                   </optgroup>
                 ))}
               </SelectInput>
+              {errors.funcao && <p role="alert" className="text-xs text-red-500 mt-1">{errors.funcao}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -524,6 +535,7 @@ export default function EditarServidor({ servidor, onClose, onSaved, onDeleted, 
               {!somenteEscola && escolasVinculadas.length === 0 && (
                 <p className="text-xs text-slate-400 mt-1">Nenhuma escola vinculada</p>
               )}
+              {errors.escolas && <p role="alert" className="text-xs text-red-500 mt-1">{errors.escolas}</p>}
             </div>
 
             <div>
